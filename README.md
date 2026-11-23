@@ -1,8 +1,8 @@
 # T90 3D Map Card
 
-Build an editable 3D floor plan from your robot’s map in Home Assistant. [Beta 6](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.6) includes the Ecovacs T90 and Roborock Qrevo map editors. T90 owners get a compact control panel, a brighter traveling light along the cleaning path, and a model-specific Start fix for the T90 MAX PLUS OMNI. During a selected-room clean, map updates keep the command status steady. All screenshots use fictional maps.
+Build an editable 3D floor plan from your robot’s map in Home Assistant. [Beta 7](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.7) includes the Ecovacs T90 and Roborock Qrevo map editors. T90 owners get a compact control panel, a brighter traveling light along the cleaning path, and a model-specific Start fix for the T90 MAX PLUS OMNI. During a selected-room clean, map updates keep the command status steady. All screenshots use fictional maps.
 
-For Dreame, SwitchBot, Roomba, Shark, Xiaomi, Matter and Valetudo, see the [compatibility table and installation guides](https://github.com/gdelagardelle/t90-map-card/blob/v0.3.0-beta.4/README.md#which-download-fits-your-robot). The beta 6 release also includes those four tester modules.
+All five beta downloads include guided setup and a local test report. Choose the module for your Home Assistant integration below.
 
 ![Roborock preview with a white Qrevo beside the controls and on a furnished fictional floor](docs/roborock-qrevo.png)
 
@@ -11,6 +11,18 @@ For Dreame, SwitchBot, Roomba, Shark, Xiaomi, Matter and Valetudo, see the [comp
 ![Night appearance with the robot controls beside the floor plan](docs/dashboard-night.png)
 
 ![A traveling light follows the recorded Ecovacs cleaning path](docs/cleaning-path.gif)
+
+## Which download fits your robot?
+
+| Robot or integration | Download from the beta 7 release | What you need |
+| --- | --- | --- |
+| Ecovacs T90, Roborock Qrevo | `t90-map-card.js` | Official integration and the vacuum’s map image. Both have 3D layout recovery and compact phone controls. |
+| Dreame L40s Pro Ultra | `dreame-map-card-beta.js` | Tasshack’s Dreame Vacuum integration with the current floor map camera. [Dreame guide](https://github.com/gdelagardelle/t90-map-card/blob/5c7c65e8dfe0e40407c0a6b7843f7d4642c94193/docs/dreame.md) |
+| SwitchBot vacuum | `switchbot-vacuum-card.js` | A supported SwitchBot vacuum integration. A source image or hand-drawn floor is optional. [SwitchBot guide](https://github.com/gdelagardelle/t90-map-card/blob/5c7c65e8dfe0e40407c0a6b7843f7d4642c94193/testers/switchbot/START-HERE.md) |
+| Roomba/Braava, Shark IQ, Xiaomi Mi Robot, Matter vacuum | `vacuum-controls-card.js` | The corresponding HA integration and a vacuum entity. An optional image or camera provides a map. A compatible Roomba+ Rooms Map can provide 3D room outlines. [Controls guide](https://github.com/gdelagardelle/t90-map-card/blob/5c7c65e8dfe0e40407c0a6b7843f7d4642c94193/testers/vacuum-controls/START-HERE.md) |
+| Robot already running Valetudo | `valetudo-map-card.js` | MQTT discovery and the robot’s Map data camera. This tester displays the native map. [Valetudo guide](https://github.com/gdelagardelle/t90-map-card/blob/5c7c65e8dfe0e40407c0a6b7843f7d4642c94193/testers/valetudo/README.md) |
+
+Get your JavaScript module from the [beta 7 release assets](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.7). When updating a manual installation, replace the same file, change the existing resource URL’s version query to `?v=beta7`, and reload the dashboard.
 
 ## Before installing
 
@@ -22,14 +34,25 @@ For Dreame, SwitchBot, Roomba, Shark, Xiaomi, Matter and Valetudo, see the [comp
 ## Install with HACS
 
 1. Open **HACS → ⋮ → Custom repositories**. Paste `https://github.com/gdelagardelle/t90-map-card` and choose **Dashboard** as the type.
-2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For the T90 Start and trail fixes or Roborock support, open **Need a different version?** and select **v0.3.0-beta.6**. Reload your dashboard after installation.
-3. Edit your dashboard and select **Add card → T90 3D Map**. Select your map source, vacuum, and its map image.
+2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For guided setup, layout recovery and the phone controls, open **Need a different version?** and select **v0.3.0-beta.7**. Reload your dashboard after installation.
+3. Edit your dashboard and choose **Add card → T90 3D Map**. Pick your vacuum. The editor suggests its integration and selects the map when it finds exactly one available image on the same device. If there are several, choose the floor you recognize in the preview. When Home Assistant omits device information, select the format and image manually.
+4. Check the preview and the detected features, then save the card. An unconfirmed feature means the editor could not verify it with the current data. For a missing map, open **Settings → Devices & services**, open the vacuum’s device, and enable its map image. The companion editors have their own source requirements. SwitchBot and Vacuum Controls also work without a map.
+
+### Sharing a beta test report
+
+On the dashboard, open **Test details**, review the preview and choose **Copy test details**. The report is generated in your browser. It contains the card version, reported integration and recognized model, detected features, and the latest command result from this card session. A command accepted by Home Assistant may still be waiting for the robot. Unrecognized model fields are omitted or marked unconfirmed. Maps, coordinates, room names, entity IDs, URLs and raw error messages are excluded. On a local HTTP dashboard, the text is selectable even if the browser blocks clipboard access.
+
+### Phone controls
+
+On the T90 and Qrevo maps, selected rooms get a soft floor tint in both themes. The compact phone bar keeps your cleaning target and primary action visible. Expand the bar for Stop, Go home and the settings exposed by your robot.
+
+![Daylight phone view with a selected room and compact cleaning controls](docs/phone-controls.png)
 
 This repository can be added directly to HACS. [HACS custom repository instructions](https://www.hacs.xyz/docs/faq/custom_repositories/)
 
 ## Manual install
 
-1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.6/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
+1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.7/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
 2. In **Settings → Dashboards → ⋮ → Resources**, add `/local/t90-map-card.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. Reload the page.
 3. Use the visual editor or add a manual card with your own entity IDs.
 
@@ -117,7 +140,9 @@ Lengths use the map’s coordinate system. Physical calibration is deferred. Edi
 
 Edits are saved in the current browser. To share them with other browsers on the same dashboard, open **Room layout → Save this layout to the dashboard**. **Export layout file** downloads your wall and furnishing edits. Import the file on the same vacuum and map configuration. Exported files contain layout information, so share them only with people you intend to give it to.
 
-Saved edits and room assignments are scoped to the configured vacuum, map image and detected floor geometry. A remap that changes the floor geometry starts a separate layout and room matching session. Renaming the configured entity IDs also changes the storage scope. Use one card for each vacuum/map pair on a storage dashboard if you want the card to write its layout there.
+Saved edits and room assignments are scoped to the configured vacuum, map image and detected floor geometry. After a remap, open **Layout recovery** and choose a previous saved layout or browser draft for this vacuum and map image. Tap two recognizable points far apart on the old drawing, then the same points in the same order on the new map. Inspect the aligned edits before saving. Older layouts can have only edits or landmarks to use for alignment. Cancel leaves your dashboard untouched.
+
+Recovery keeps the source layout and backs up any existing destination edits. Choose the cleaning target again after saving. For Ecovacs, match room names again. For Roborock, check any room-specific floor finishes and choose them again. The recovery applies to the 3D dashboard. The robot’s navigation map stays under its own integration’s control. Renaming the configured entity IDs also changes the storage scope. Use one card for each vacuum/map pair on a storage dashboard if you want the card to write its layout there.
 
 ## Compatibility
 

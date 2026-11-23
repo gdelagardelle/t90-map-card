@@ -3,6 +3,7 @@ import * as THREE from 'three';
 // The card supplies only region paths matched to this vacuum's live room data.
 export function setupRoomPicking({ canvas, camera, floors, marble, side, viewer, draw }) {
   const selectedMarble = marble.clone();
+  const selectionTint = new THREE.Color(0x54ae9e);
   const highlighted = [selectedMarble, side];
   const ray = new THREE.Raycaster();
   const hitPoint = new THREE.Vector2();
@@ -128,9 +129,9 @@ export function setupRoomPicking({ canvas, camera, floors, marble, side, viewer,
     draw();
   };
   function setLighting(night) {
-    selectedMarble.color.setHex(night ? 0xd9b48b : 0xe1bb8c);
-    selectedMarble.emissive.setHex(night ? 0x6f4928 : 0x4e341e);
-    selectedMarble.emissiveIntensity = night ? 0.35 : 0.12;
+    selectedMarble.color.copy(marble.color).lerp(selectionTint, night ? 0.45 : 0.39);
+    selectedMarble.emissive.setHex(0x2f675e);
+    selectedMarble.emissiveIntensity = night ? 0.24 : 0.06;
   }
   return {setLighting,refreshPins,setActivePosition};
 }
