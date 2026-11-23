@@ -368,6 +368,7 @@ function renderPreview() {
   const side = makeMaterial(0x302824);
   const floorMaterials = [marble, side];
   const scannedWalls = wallSegments(walls);
+  window.deebotRecoveryWalls=()=>scannedWalls.map(([a,b])=>[a.x,a.y,b.x,b.y]);
 
   const selectableFloors = [];
   for (const path of floors) {

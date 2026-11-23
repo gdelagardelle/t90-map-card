@@ -264,7 +264,8 @@ try {
   assert.equal(await replay.isDisabled(),true);
   await scene.getByRole('button',{name:'Cleaning path',exact:true}).click();
   await page.emulateMedia({reducedMotion:'reduce'});
-  assert.equal(await replay.isDisabled(),true);
+  // The media query change is delivered to the map iframe asynchronously.
+  await replay.and(scene.locator('button:disabled')).waitFor({timeout:3000});
   await page.emulateMedia({reducedMotion:'no-preference'});
   const callsBefore=await page.evaluate(()=>calls.length);
   const canvasImage = scene.locator('canvas');

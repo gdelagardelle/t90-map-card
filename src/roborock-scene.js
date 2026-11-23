@@ -236,9 +236,12 @@ function recolor() {
       surface.material.roughnessMap.image.data[4*cell+1]=roughByColor.get(rgb) ?? roughness[finish.material] ?? 210;
     }
     const highlight=floor && selection.has(colors.get(rgb));
-    d[i]=highlight?(tile[t]+255)/2:tile[t];
-    d[i+1]=highlight?(tile[t+1]+168)/2:tile[t+1];
-    d[i+2]=highlight?(tile[t+2]+64)/2:tile[t+2];d[i+3]=255;
+    // Keep grain, veining and grout visible beneath the selected-room wash.
+    const wash=highlight ? 0.27 : 0;
+    d[i]=tile[t]+(84-tile[t])*wash;
+    d[i+1]=tile[t+1]+(174-tile[t+1])*wash;
+    d[i+2]=tile[t+2]+(158-tile[t+2])*wash;
+    d[i+3]=255;
   }
   ctx.putImageData(copy,0,0); texture.needsUpdate=true;
   if(rebuildSlab){

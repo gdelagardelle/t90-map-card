@@ -85,6 +85,12 @@ try {
   });
   await start.click();
   assert.match(await status.textContent(), /Start failed.*Robot is busy at the station/);
+  const details=page.getByText('Test details',{exact:true});
+  await details.click();await page.waitForFunction(()=>card.q('.test-details textarea').value);
+  const report=await page.locator('.test-details textarea').inputValue();
+  assert.match(report,/Last command: Start · Rejected/);
+  assert.doesNotMatch(report,/vacuum\.demo_robot|image\.demo_floor|kitchen|Robot is busy/i);
+  await details.click();
   await page.evaluate(() => {
     h.callService = async (...args) => calls.push(args);
     h.connected = false; card.hass = h;
