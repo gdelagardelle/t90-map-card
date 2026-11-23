@@ -307,6 +307,10 @@ ${cardStyles}</style>
       if (host) {
         host.canEdit=!!this.rrFloor;
         host.blob=this.rrBlob;
+        const vacuum=this.h?.states[this.vacuum];
+        host.vacuumState=vacuum?.state;
+        host.stateSince=vacuum?.last_changed;
+        host.imageTime=this.mapStamp;
         host.rooms=this.rrFloor?.rooms || [];
         host.selected=[...this.selectedRooms];
         this.frame.contentWindow?.roborockUpdate?.(host);

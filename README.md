@@ -1,6 +1,6 @@
 # T90 3D Map Card
 
-Build an editable 3D floor plan from your robot’s map in Home Assistant. Choose rooms, follow the vacuum, and furnish the floor plan in your browser. Stable v0.2.0 supports the Ecovacs Deebot T90. The [v0.3.0-beta.1 preview](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.1) adds Roborock Qrevo support. All screenshots use fictional maps.
+Build an editable 3D floor plan from your robot’s map in Home Assistant. Choose rooms, follow the vacuum, and furnish the floor plan in your browser. Stable v0.2.0 supports the Ecovacs Deebot T90. The [v0.3.0-beta.2 preview](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.2) supports Roborock Qrevo maps and adds taller walls and a glowing cleaning path. All screenshots use fictional maps.
 
 ![Roborock preview with a white Qrevo beside the controls and on a furnished fictional floor](docs/roborock-qrevo.png)
 
@@ -18,14 +18,14 @@ Build an editable 3D floor plan from your robot’s map in Home Assistant. Choos
 ## Install with HACS
 
 1. Open **HACS → ⋮ → Custom repositories**. Paste `https://github.com/gdelagardelle/t90-map-card` and choose **Dashboard** as the type.
-2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For Roborock, open **Need a different version?** and select **v0.3.0-beta.1**. Reload your dashboard after installation.
+2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For Roborock, open **Need a different version?** and select **v0.3.0-beta.2**. Reload your dashboard after installation.
 3. Edit your dashboard and select **Add card → T90 3D Map**. Select your map source, vacuum, and its map image.
 
 This repository can be added directly to HACS. [HACS custom repository instructions](https://www.hacs.xyz/docs/faq/custom_repositories/)
 
 ## Manual install
 
-1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.1/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
+1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.2/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
 2. In **Settings → Dashboards → ⋮ → Resources**, add `/local/t90-map-card.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. Reload the page.
 3. Use the visual editor or add a manual card with your own entity IDs.
 
@@ -53,7 +53,7 @@ entity: vacuum.my_qrevo
 map_entity: image.my_qrevo_map_0
 ```
 
-The Qrevo view renders modeled walls and a textured floor in the browser from the native map image. Drag to orbit, zoom, or choose **Top view**. The robot, dock, carpets and recorded path update when Home Assistant supplies a new image. Their visibility depends on the integration’s map settings. The native image includes the recorded path as drawn by Roborock. The **Cleaning path** and **Carpet scan** switches start off. Each remembers your choice per floor in this browser. The renderer estimates the surface beneath hidden scan markings from neighboring pixels. Rugs placed in the furniture editor are separate. When the card recognizes the stock robot marker, it places a white 3D Qrevo with a lidar turret at that position. The side panel shows the same illustrative model. If the marker is missing or ambiguous the renderer keeps the source image markings. Use **Original scan** to compare your design with the current Roborock image. The Ecovacs path-reset feature applies to the Ecovacs vector map.
+The Qrevo view renders modeled walls and a textured floor in the browser from the native map image. Drag to orbit, zoom, or choose **Top view**. The robot, dock, carpets and recorded path update when Home Assistant supplies a new image. Their visibility depends on the integration’s map settings. The native image includes the recorded path as drawn by Roborock. The **Cleaning path** appears automatically during a cleaning run unless you switched it off. **Carpet scan** starts off. Both switches remember your choice per floor in this browser. The renderer estimates the surface beneath hidden scan markings from neighboring pixels. Rugs placed in the furniture editor are separate. When the card recognizes the stock robot marker, it places a white 3D Qrevo with a lidar turret at that position. The side panel shows the same illustrative model. If the marker is missing or ambiguous the renderer keeps the source image markings. Use **Original scan** to compare your design with the current Roborock image. During cleaning, a light sweeps along the growing route. Roborock supplies a flat image, so the card records newly visible stretches and estimates their order within each image. At crossings or when opening a map mid-run, the sweep can differ from the exact driving order. Ecovacs supplies an ordered vector route. The light grows stronger with recorded distance, freezes to a static trail while paused, and respects your reduced-motion setting.
 
 ### Edit and render a Qrevo floor
 
@@ -72,7 +72,7 @@ Map rendering and room selections have been exercised against Qrevo 2 Pro Series
 
 ## Map appearance
 
-Choose **Daylight** or **Night** at the top of the card. Daylight pairs a pale marble map with the cleaning controls below it. Night uses cooler shadows and amber lighting, with the robot alongside the map on wide dashboards. The choice is remembered in this browser for the configured vacuum and map. You can switch while editing or tracking a cleaning run.
+Choose **Daylight** or **Night** at the top of the card. Daylight pairs pale marble with warm controls. Night uses cooler shadows and amber lighting. Both appearances show the robot, cleaning target and controls to the right of the map on wide cards. They stack below the map when the card is 760 pixels wide or narrower. The choice is remembered in this browser for the configured vacuum and map. You can switch while editing or tracking a cleaning run.
 
 ## Clean rooms with a Deebot T90
 

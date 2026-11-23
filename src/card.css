@@ -16,23 +16,20 @@ button:enabled:hover { border-color:var(--accent) }
 .picker { display:inline-flex; border:1px solid var(--edge); background:color-mix(in srgb,var(--ink) 5%,var(--paper)); border-radius:30px; padding:3px }
 .picker button { background:transparent; border:0; border-radius:24px; min-height:34px; font-size:13px; padding:6px 13px; color:var(--dim) }
 .picker [aria-pressed=true] { color:var(--ink); background:var(--paper); font-weight:650; box-shadow:0 1px 4px #0002 }
-.map-row { display:grid; grid-template-areas:"map" "robot"; grid-template-columns:minmax(0,1fr) }
+.map-row { display:grid; grid-template-areas:"map robot"; grid-template-columns:minmax(0,1fr) clamp(200px,24%,265px) }
 iframe { grid-area:map; width:100%; display:block; height:clamp(520px,65vh,740px); border:0; background:var(--map-surface) }
-.robot-panel { grid-area:robot; display:grid; grid-template-columns:100px minmax(0,1fr) minmax(0,1fr) minmax(190px,1fr); align-items:center; gap:16px; padding:18px clamp(16px,3%,30px); border-top:1px solid var(--edge) }
-.robot-panel img { width:100%; height:88px; object-fit:contain; grid-column:1 }
+.robot-panel { grid-area:robot; display:flex; flex-direction:column; justify-content:center; gap:16px; padding:22px; border-left:1px solid var(--edge) }
+.robot-panel img { width:100%; height:125px; object-fit:contain; grid-column:1 }
 .identity { grid-column:2 }
 .robot-panel h2 { font-size:clamp(20px,2vw,26px); line-height:1.12; letter-spacing:-.045em; overflow-wrap:anywhere }
 .vitals,.muted,.note,.target-label { color:var(--dim); font-size:14px }
-.targetbox { border-left:1px solid var(--edge); padding-left:20px }
+.targetbox { border-top:1px solid var(--edge); padding-top:16px }
 .target-label { font-size:12px }.target { font-size:17px; font-weight:600; overflow-wrap:anywhere }
 .actions,.chips { display:flex; align-items:center; gap:8px; flex-wrap:wrap }
 .main-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px }
 .main-actions button { min-width:0; padding:8px 4px; font-size:13px; overflow-wrap:anywhere }
 .main-actions .primary { grid-column:1/-1; font-size:15px }
-:host([data-appearance=night]) .map-row { grid-template-areas:"map robot"; grid-template-columns:minmax(0,1fr) clamp(200px,24%,265px) }
-:host([data-appearance=night]) .robot-panel { display:flex; flex-direction:column; align-items:stretch; justify-content:center; border:0; border-left:1px solid var(--edge); padding:22px; background:linear-gradient(150deg,#282a29,#1d2022 73%) }
-:host([data-appearance=night]) .robot-panel img { height:125px }
-:host([data-appearance=night]) .targetbox { border:0; border-top:1px solid var(--edge); padding:16px 0 0 }
+:host([data-appearance=night]) .robot-panel { background:linear-gradient(150deg,#282a29,#1d2022 73%) }
 .panel { padding:clamp(16px,3%,30px); display:grid; gap:16px; border-top:1px solid var(--edge) }
 .chips button { font-size:14px; border-radius:18px; min-height:36px }
 .chips [aria-pressed=true],.reassign[aria-pressed=true] { background:var(--selected); border-color:var(--accent); color:var(--accent) }
@@ -45,10 +42,10 @@ summary { font-weight:600; min-height:32px }.content { display:grid; gap:12px; m
 dialog { width:min(360px,calc(100vw - 32px)); padding:22px; border:1px solid var(--edge); color:var(--ink); background:var(--paper); border-radius:15px }
 dialog::backdrop { background:#09090999 } dialog select { display:block; width:100%; margin:12px 0 }
 @container(max-width:760px) {
-  :host([data-appearance=night]) .map-row,.map-row { grid-template-areas:"map" "robot"; grid-template-columns:minmax(0,1fr) }
-  :host([data-appearance=night]) .robot-panel,.robot-panel { display:grid; grid-template-columns:68px minmax(0,1fr); gap:10px; align-items:center; border:0; border-top:1px solid var(--edge); padding:16px }
-  :host([data-appearance=night]) .robot-panel img,.robot-panel img { height:55px }
-  :host([data-appearance=night]) .targetbox,.targetbox { grid-column:1/-1; border:0; padding:0 }
+  .map-row { grid-template-areas:"map" "robot"; grid-template-columns:minmax(0,1fr) }
+  .robot-panel { display:grid; grid-template-columns:68px minmax(0,1fr); gap:10px; align-items:center; border:0; border-top:1px solid var(--edge); padding:16px }
+  .robot-panel img { height:55px }
+  .targetbox { grid-column:1/-1; border:0; padding:0 }
   .main-actions { grid-column:1/-1 }
   iframe { height:540px }
 }

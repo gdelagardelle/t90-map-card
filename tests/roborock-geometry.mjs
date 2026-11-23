@@ -71,3 +71,18 @@ assert.equal(locateRobot(icon),null);
 stamp(42,36);const pose=locateRobot(icon);
 assert.deepEqual([pose.x,pose.y,pose.radius],[42,36,12]);assert.equal(pose.heading,Math.PI/2);
 stamp(112,36);assert.equal(locateRobot(icon),null);
+
+// Newly arriving route ink keeps its chronology even when the path folds back.
+const {RasterRoute}=await import('../src/roborock-route-order.js');
+const pixelsWithInk=xs=>{
+  const rgba=new Uint8Array(8*4);
+  for(const x of xs)rgba.set([147,194,238,255],x*4);
+  return rgba;
+};
+const raster=new RasterRoute(8,1,pixelsWithInk([0]));
+raster.update(pixelsWithInk([0,1,2,3]),{x:4,y:0});
+assert.equal(raster.count,3);
+assert.deepEqual([...raster.ranks.slice(1,4)],[1,2,3]);
+raster.update(pixelsWithInk([1,2,3,5,6]),{x:7,y:0});
+assert.deepEqual([...raster.ranks],[0,1,2,3,0,4,5,0]);
+assert.equal(raster.rgba[4*4+3],0);

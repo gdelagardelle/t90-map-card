@@ -77,6 +77,34 @@ try {
     const canvas=frame.locator('canvas');
     const pathButton=frame.getByRole('button',{name:'Cleaning path',exact:true});
     assert.equal(await pathButton.getAttribute('aria-pressed'),'false');
+    if(!sample){
+      // Home Assistant can publish a state transition before the first new map.
+      const state=async value=>page.evaluate(value=>{
+        hass.states['vacuum.test'].state=value;card.refresh();
+      },value);
+      await state('cleaning');
+      assert.equal(await pathButton.getAttribute('aria-pressed'),'true');
+      await page.evaluate(async()=>{
+        const bitmap=await createImageBitmap(mapImage),cv=document.createElement('canvas');
+        cv.width=bitmap.width;cv.height=bitmap.height;
+        const ctx=cv.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
+        ctx.fillStyle='#93c2ee';ctx.fillRect(15,105,92,5);ctx.fillRect(102,75,5,35);
+        card.rrBlob=await new Promise(resolve=>cv.toBlob(resolve));card.refresh();
+      });
+      await frame.locator('.viewer[data-route-pulse=moving]').waitFor();
+      const firstPulse=await canvas.screenshot();
+      await page.waitForTimeout(450);
+      assert.ok(!firstPulse.equals(await canvas.screenshot()),'The sweep should change the rendered pixels');
+      await page.emulateMedia({reducedMotion:'reduce'});
+      await frame.locator('.viewer[data-route-pulse=still]').waitFor();
+      await page.emulateMedia({reducedMotion:'no-preference'});
+      await state('paused');assert.equal(await viewer.getAttribute('data-route-pulse'),'off');
+      await state('cleaning');await frame.locator('.viewer[data-route-pulse=moving]').waitFor();
+      await pathButton.click();assert.equal(await viewer.getAttribute('data-route-pulse'),'off');
+      await state('docked');
+      await page.evaluate(()=>{card.rrBlob=mapImage;card.refresh();});
+      await page.waitForFunction(()=>card.rrDisplayed===mapImage);
+    }
     const hidden=await canvas.screenshot();
     const carpetButton=frame.getByRole('button',{name:'Carpet scan',exact:true});
     assert.equal(await carpetButton.getAttribute('aria-pressed'),'false');

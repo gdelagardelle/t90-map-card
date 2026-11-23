@@ -14,7 +14,7 @@ const browser = await chromium.launch({executablePath:process.env.CHROME_BIN || 
   args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try {
   const page=await browser.newPage({viewport:{width:1410,height:935},deviceScaleFactor:1});
-  const errors=[]; page.on('pageerror', e=>errors.push(e.message));
+  const errors=[];page.on('console',message=>{if(message.type()==='error' && /shader|WebGLProgram/i.test(message.text()))errors.push(message.text());}); page.on('pageerror', e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+server.address().port+'/demo/robot');
   await page.evaluate(async ({rooms,svg}) => {
     await customElements.whenDefined('t90-map-card');
@@ -68,7 +68,7 @@ try {
     return { below:robot.top >= map.bottom - 1, beside:robot.left >= map.right - 1 };
   });
   assert.equal(await lookButton('Daylight').getAttribute('aria-pressed'),'true');
-  assert.equal((await layoutBounds()).below,true);
+  assert.equal((await layoutBounds()).beside,true);
   assert.equal(await scene.locator('.tools').evaluate(el=>el.getBoundingClientRect().bottom <= window.innerHeight),true);
   if (process.argv.includes('--pictures')) {
     await mkdir('docs',{recursive:true});
@@ -82,9 +82,12 @@ try {
   assert.equal(await start.isEnabled(),true);
   if (process.argv.includes('--pictures')) await card.locator('.cockpit').screenshot({path:'docs/dashboard-night.png'});
   await page.setViewportSize({width:390,height:844});
-  assert.equal((await layoutBounds()).below,true);
-  assert.equal(await scene.locator('.tools').evaluate(el=>el.getBoundingClientRect().bottom <= window.innerHeight),true);
-  assert.equal(await card.evaluate(c => c.scrollWidth <= c.clientWidth),true);
+  for (const appearance of ['Daylight','Night']) {
+    await lookButton(appearance).click();
+    assert.equal((await layoutBounds()).below,true);
+    assert.equal(await scene.locator('.tools').evaluate(el=>el.getBoundingClientRect().bottom <= window.innerHeight),true);
+    assert.equal(await card.evaluate(c => c.scrollWidth <= c.clientWidth),true);
+  }
   await page.setViewportSize({width:1410,height:935});
   await scene.getByRole('button',{name:'Lock layout',exact:true}).click();
   assert.equal(await scene.getByRole('button',{name:'Edit walls'}).count(),0);
@@ -228,6 +231,15 @@ try {
   assert.equal(await lookButton('Night').getAttribute('aria-pressed'),'true');
   await scene.locator('[data-tracking=live]').waitFor();
   assert.equal(await scene.locator('html').getAttribute('data-appearance'),'night');
+  await scene.locator('canvas').scrollIntoViewIfNeeded();
+  await page.evaluate(()=>{
+    const sample={...card.overlay,received:Date.now()+1000,mapTime:new Date().toISOString(),state:'cleaning',
+      route:'M75 -90l140 0 0 -22 -125 0 0 -22 125 0 0 -40 -140 0'};
+    card.frame.contentWindow.deebotTrackingUpdate(sample);
+  });
+  await scene.locator('.viewer[data-route-pulse=moving]').waitFor();
+  await scene.getByRole('button',{name:'Cleaning path',exact:true}).click();
+  assert.equal(await scene.locator('.viewer').getAttribute('data-route-pulse'),'off');
   assert.deepEqual(errors,[]);
   console.log('Passed: dynamic maps, clean initial layout, floor switch, scoped edits, room 0, lock and room taps, wall angle, furniture handles, pause/resume, invalid map.');
 } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }

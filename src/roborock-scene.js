@@ -1,3 +1,5 @@
+import { routeLight,lightWave } from './route-light.js';
+import { RasterRoute } from './roborock-route-order.js';
 import { locateRobot } from './roborock-marker.js';
 import { qrevoModel,qrevoPortrait,addLocator } from './roborock-robot.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -25,18 +27,22 @@ let cleanPixels=null,wallCells,floorCells,slab;
 let rebuildSlab=true;
 let contact;
 const stockPalette=roomColors(Array.from({length:32},(_,i)=>({id:i+1})));
-function overlayControl(button,key) {
-  let shown=false;
-  try{shown=localStorage.getItem(host.scope+key)==='true';}catch{}
-  button.setAttribute('aria-pressed',String(shown));
+let vacuumState,runOpen=false,order,baseline,firstFrame=false;
+let inkMap;
+const inkStep={value:new THREE.Vector2()},inkTexture={value:null},inkTotal={value:1},inkVisible={value:0},inkGain={value:0};
+function overlayControl(button,key,defaultOn=()=>false) {
+  let choice=null;
+  try{choice=localStorage.getItem(host.scope+key);}catch{}
+  const visible=()=>choice===null?defaultOn():choice==='true';
+  button.setAttribute('aria-pressed',String(visible()));
   button.onclick=()=>{
-    shown=!shown;button.setAttribute('aria-pressed',String(shown));
-    try{localStorage.setItem(host.scope+key,String(shown));}catch{}
-    cleanPixels=null;rebuildSlab=true;recolor();
+    choice=String(!visible());button.setAttribute('aria-pressed',String(visible()));
+    try{localStorage.setItem(host.scope+key,String(visible()));}catch{}
+    cleanPixels=null;rebuildSlab=true;syncPulse();recolor();
   };
-  return ()=>shown;
+  return visible;
 }
-const showTrail=overlayControl(routeButton,':show-cleaning-path');
+const showTrail=overlayControl(routeButton,':show-cleaning-path',()=>runOpen);
 const showCarpet=overlayControl(carpetButton,':show-carpet');
 
 const css=document.createElement('style');
@@ -72,6 +78,25 @@ let renderer,camera,orbit,scene,surface,walls,light,sky,rim,windowLight,ground,p
 const practicals=[];
 const studioLevel={value:0},studioScale={value:1};
 function polishFloor(shader){
+  Object.assign(shader.uniforms,{inkStep,inkTexture,inkTotal,inkVisible,inkGain,inkPhase:pulse.phase});
+  shader.fragmentShader='uniform vec2 inkStep; uniform sampler2D inkTexture; uniform float inkTotal,inkVisible,inkGain,inkPhase;\n'+lightWave+`
+    float inkLight(vec4 sampleInk){
+      float rank=dot(floor(sampleInk.rgb*255.+.5),vec3(65536.,256.,1.))/max(1.,inkTotal);
+      return sampleInk.a*routeWave(rank,inkPhase)*inkGain;
+    }
+  `+shader.fragmentShader.replace('#include <opaque_fragment>',`
+    if(inkVisible>.5){
+      vec4 ink=texture2D(inkTexture,vMapUv);
+      float wave=inkLight(ink);
+      float glow=inkLight(texture2D(inkTexture,vMapUv+vec2(inkStep.x,0.)))
+                +inkLight(texture2D(inkTexture,vMapUv-vec2(inkStep.x,0.)))
+                +inkLight(texture2D(inkTexture,vMapUv+vec2(0.,inkStep.y)))
+                +inkLight(texture2D(inkTexture,vMapUv-vec2(0.,inkStep.y)));
+      outgoingLight+=vec3(.07,.52,.49)*glow*.25;
+      vec3 line=mix(vec3(.09,.36,.38),vec3(2.3,4.9,4.7),wave);
+      outgoingLight=mix(outgoingLight,line,ink.a*(.60+.40*wave));
+    }
+    #include <opaque_fragment>`);
   shader.uniforms.studioLevel=studioLevel;shader.uniforms.studioScale=studioScale;
   shader.vertexShader='varying vec2 studioFloor;\n'+shader.vertexShader.replace('#include <project_vertex>',
     '#include <project_vertex>\n studioFloor=(modelMatrix*vec4(transformed,1.)).xz;');
@@ -103,6 +128,31 @@ wallShape.setAttribute('color',new THREE.Float32BufferAttribute(wallTints,3));
 const transform = new THREE.Object3D();
 const ray = new THREE.Raycaster();
 const draw = () => { if (renderer && surface) renderer.render(scene,camera); };
+const pulse=routeLight(viewer,draw);
+function syncPulse(){
+  const on=runOpen && showTrail() && !!order?.count;
+  inkVisible.value=on?1:0;
+  pulse.enable(!!(on && vacuumState==='cleaning' && !planner?.comparing && !editingFurniture && !planner?.editing));
+}
+function clearRoute(){
+  order=null;inkMap?.dispose();inkMap=null;inkTexture.value=null;inkTotal.value=1;inkVisible.value=0;
+}
+function updateRoute(){
+  if(!runOpen)return;
+  if(!order || order.width!==pixels.width || order.height!==pixels.height){
+    clearRoute();
+    const stale=firstFrame && Date.parse(host.imageTime)<Date.parse(host.stateSince);
+    const old=stale?pixels:baseline;
+    order=new RasterRoute(pixels.width,pixels.height,old?.width===pixels.width && old?.height===pixels.height?old.data:null);
+    firstFrame=false;baseline=null;
+    inkMap=new THREE.DataTexture(order.rgba,pixels.width,pixels.height);
+    inkMap.flipY=true;inkTexture.value=inkMap;inkStep.value.set(2/pixels.width,2/pixels.height);
+  }
+  order.update(pixels.data,marker);
+  inkMap.needsUpdate=true;inkTotal.value=order.end;
+  inkGain.value=.23+.77*Math.min(1,order.end/Math.max(1,pixels.width*.65));
+  syncPulse();
+}
 function frame() {
   if (!surface) return;
   const extent=Math.max(paint.width,paint.height), ratio=viewer.clientWidth/Math.max(1,viewer.clientHeight);
@@ -136,7 +186,7 @@ function deletedAt(x,y) {
 function recolor() {
   if (!pixels || !texture) return;
   if(!cleanPixels){
-    const hideTrail=!showTrail(),hideCarpet=!showCarpet();
+    const hideTrail=runOpen || !showTrail(),hideCarpet=!showCarpet();
     cleanPixels=(hideTrail || hideCarpet || marker) ? withoutScanOverlays(pixels,stockPalette,{hideTrail,hideCarpet,marker}) : pixels;
   }
   const source=cleanPixels;
@@ -286,9 +336,10 @@ function buildWalls() {
   }
   if(walls) { scene.remove(walls); walls.dispose(); }
   walls = new THREE.InstancedMesh(wallShape,wallMaterial,runs.length);
+  const wallHeight=48;
   runs.forEach(([a,b,y],i)=>{
-    transform.position.set((a+b-w)/2,15,y-h/2);
-    transform.scale.set(b-a,30,step);
+    transform.position.set((a+b-w)/2,wallHeight/2,y-h/2);
+    transform.scale.set(b-a,wallHeight,step);
     transform.updateMatrix(); walls.setMatrixAt(i,transform.matrix);
   });
   walls.castShadow=true;walls.receiveShadow=true;scene.add(walls);
@@ -338,7 +389,7 @@ function setupFurniture() {
     }),
     storage:planner.furnitureStorage,render:()=>{furniture?.refreshHandles();placeLights();draw();},
     onEditing:active=>{
-      editingFurniture=active;orbit.enabled=!active;nav.hidden=active;
+      editingFurniture=active;syncPulse();orbit.enabled=!active;nav.hidden=active;
       document.querySelector('.rr-edit').hidden=active;document.querySelector('.rr-erase').hidden=active;
       document.querySelector('[data-view=source]').disabled=active;
       view(active);editZoom.visible(active);
@@ -367,6 +418,7 @@ async function present(blob) {
         robot.position.set(marker.x+.5-pixels.width/2,.3,marker.y+.5-pixels.height/2);
         robot.rotation.y=marker.heading;
       }
+      updateRoute();
       if(resize) {
         if(surface) {scene.remove(surface);surface.geometry.dispose();surface.material.roughnessMap.dispose();surface.material.dispose();texture.dispose();}
         texture=new THREE.CanvasTexture(paint); texture.colorSpace=THREE.SRGBColorSpace;
@@ -444,7 +496,19 @@ window.t90SetAppearance=look=>{
   host.appearance=look;document.documentElement.dataset.appearance=look;
   setSceneLight();draw();
 };
-window.roborockUpdate = ({blob,rooms,selected})=>{
+window.roborockUpdate = ({blob,rooms,selected,vacuumState:state})=>{
+  if(state!==vacuumState){
+    const prior=vacuumState;vacuumState=state;
+    if(state==='cleaning' && !runOpen){
+      clearRoute();runOpen=true;firstFrame=true;
+      baseline=prior==='docked' || prior==='idle'?pixels:null;
+      if(pixels && blob===currentBlob)updateRoute();
+    } else if(state==='docked' || state==='idle'){
+      runOpen=false;baseline=null;clearRoute();
+    }
+    routeButton.setAttribute('aria-pressed',String(showTrail()));
+    cleanPixels=null;syncPulse();recolor();
+  }
   const next=new Set(selected);
   const changed=next.size!==selection.size || [...next].some(v=>!selection.has(v)) || rooms!==host.drawnRooms;
   planner?.updateRooms(rooms);host.drawnRooms=rooms; selection=next; if (changed) colors=roomColors(rooms);
@@ -511,8 +575,8 @@ try {
     grid:tool=>({cells:tool==='delete-floor'?floorCells:wallCells,width:Math.ceil(pixels.width/4),height:Math.ceil(pixels.height/4)}),
     pick:point=>pickWall(wallCells,Math.ceil(pixels.width/4),Math.ceil(pixels.height/4),point,
       Math.min(24,Math.max(4,8*(camera.right-camera.left)/camera.zoom/viewer.clientWidth))),editFurniture:furnishingButton,change:updateDesign,
-    topView:active=>{orbit.enabled=!active;nav.hidden=active;view(active);editZoom.visible(active);},
-    originalView:active=>{viewer.dataset.camera=active?'scan':topView?'top':'floor';carpetButton.disabled=routeButton.disabled=active;if(active)displayNative(currentBlob);native.hidden=!active;nav.hidden=active;}
+    topView:active=>{syncPulse();orbit.enabled=!active;nav.hidden=active;view(active);editZoom.visible(active);},
+    originalView:active=>{syncPulse();viewer.dataset.camera=active?'scan':topView?'top':'floor';carpetButton.disabled=routeButton.disabled=active;if(active)displayNative(currentBlob);native.hidden=!active;nav.hidden=active;}
   });
   tools.firstElementChild.classList.add('rr-edit');
   let tap;

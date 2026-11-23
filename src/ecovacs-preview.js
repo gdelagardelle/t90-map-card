@@ -1,3 +1,4 @@
+import { routeLight,lightWave } from './route-light.js';
 import { setupRoomPicking } from './ecovacs-room-picking.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -328,7 +329,7 @@ function renderPreview() {
   const activeWallFaces = [
     activeWallMaterial, activeWallMaterial, activeWallCap, activeWallMaterial, activeWallMaterial, activeWallMaterial,
   ];
-  const wallHeight = 11.5;
+  const wallHeight = 18;
   const segments = scannedWalls;
   const wallMeshes = new Map();
   const gapPreview = new THREE.MeshBasicMaterial({ color: 0xc78952, transparent: true, opacity: 0.63 });
@@ -475,13 +476,34 @@ function renderPreview() {
   const routeHalo = new THREE.MeshBasicMaterial({
     color: 0xe8944d, opacity: 0.24, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide,
   });
+  const pulse=routeLight(viewer,()=>renderer.render(scene,camera));
+  const totalLength={value:0};
+  const luminous=new THREE.ShaderMaterial({
+    transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false,
+    uniforms:{phase:pulse.phase,total:totalLength},
+    vertexShader:`attribute float travel;varying float along;varying float across;
+      void main(){along=travel;across=uv.y*2.-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`uniform float phase,total;varying float along,across;`+lightWave+`
+      void main(){
+        float core=exp(-abs(across)*7.);
+        float wave=routeWave(along/max(total,.001),phase)*(.23+.77*min(1.,total/140.));
+        gl_FragColor=vec4(mix(vec3(.08,.88,.87),vec3(.88,1.,1.),core),wave*(.54+.46*core)*(1.-across*across));
+        #include <colorspace_fragment>
+      }`
+  });
+  let lastSample;
   let traceSegments = 0;
+  function syncPulse(){
+    pulse.enable(!!(lastSample?.state==='cleaning' && route.visible && traceSegments &&
+      !viewer.classList.contains('show-source') && viewer.parentElement.dataset.editing!=='true'));
+  }
   function replaceRoute(routePath, baselinePath) {
     for (const child of [...route.children]) {
       route.remove(child);
       child.geometry.dispose();
     }
     traceSegments = 0;
+    totalLength.value=0;
     let matching = Boolean(baselinePath);
     for (const [index, path] of (routePath?.subPaths ?? []).entries()) {
       let points = path.getPoints(1);
@@ -495,10 +517,21 @@ function renderPreview() {
       }
       if (points.length < 2) continue;
       traceSegments += points.slice(1).filter((point, index) => point.distanceTo(points[index]) >= 0.03).length;
-      for (const [width, material, lift] of [[1.95, routeHalo, 0.24], [0.68, routeMaterial, 0.32]]) {
+      const distances=[totalLength.value];
+      for(let i=1;i<points.length;i++) distances.push(distances[i-1]+points[i].distanceTo(points[i-1]));
+      totalLength.value=distances.at(-1);
+      for (const [width, material, lift] of [[1.95, routeHalo, 0.24], [0.68, routeMaterial, 0.32], [2.6,luminous,.40]]) {
         const style = SVGLoader.getStrokeStyle(width, '#ffffff', 'round', 'round');
         const geometry = SVGLoader.pointsToStroke(points, style, 6, 0.03);
         if (!geometry) continue;
+        if(material===luminous){
+          const uv=geometry.getAttribute('uv'),travel=new Float32Array(uv.count);
+          for(let i=0;i<travel.length;i++){
+            const at=Math.min(distances.length-1,Math.max(0,Math.round(uv.getX(i)*(distances.length-1))));
+            travel[i]=distances[at];
+          }
+          geometry.setAttribute('travel',new THREE.BufferAttribute(travel,1));
+        }
         geometry.rotateX(Math.PI / 2);
         const strip = addMesh(route, geometry, material, 0, lift);
         strip.castShadow = false;
@@ -639,9 +672,12 @@ function renderPreview() {
   }
   motionPreference.addEventListener('change', settleCamera);
   sourceButton.addEventListener('click', settleCamera);
+  new MutationObserver(syncPulse).observe(viewer,{attributes:true,attributeFilter:['class']});
+  new MutationObserver(syncPulse).observe(viewer.parentElement,{attributes:true,attributeFilter:['data-editing']});
   routeButton.addEventListener('click', () => {
     route.visible = !route.visible;
     routeButton.setAttribute('aria-pressed', String(route.visible));
+    syncPulse();
     draw();
   });
 
@@ -793,7 +829,6 @@ function renderPreview() {
   let previousBaseline;
   const status = document.querySelector('.device-state');
   const feedLabel = document.querySelector('.feed-label');
-  let lastSample;
   let previousRoute;
   function updateStatus() {
     if (!lastSample) return;
@@ -831,6 +866,7 @@ function renderPreview() {
     }
     viewer.dataset.robotPosition = sample.xy?.join(',') ?? '';
     lastSample = sample;
+    syncPulse();
     updateStatus();
     draw();
   };
