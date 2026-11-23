@@ -41,7 +41,7 @@ class VacuumControlsCard extends HTMLElement {
       this.q('.actions').append(b);
     }
     this.report=attachReport(this,this.q('ha-card'),'controls',()=>this.config,()=>({
-      map3d:!!this.planShown,map2d:!!this.picture,rooms:this.config && this.h && this.targets().length>0,
+      map3d:!!this.q('.map').firstElementChild?.renderer,map2d:!!this.picture,rooms:this.config && this.h && this.targets().length>0,
       position:this.trail.points.length>0,trail:this.trail.points.length>1
     }));
     this.q('select').onchange=e=>this.run('set_fan_speed',e.target.value);

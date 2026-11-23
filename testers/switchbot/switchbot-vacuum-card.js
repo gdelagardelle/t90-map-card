@@ -57,7 +57,7 @@ class SwitchBotVacuumCard extends HTMLElement {
       this.$(".controls").append(b);
     }
     this.report=attachReport(this,this.$('ha-card'),'switchbot',()=>this.config,()=>({
-      map3d:!!this.planView, map2d:!!this.mapCard, rooms:getRoomTargets(this.h,this.config?.entity,this.config?.room_selection===true).length>0
+      map3d:!!this.planView?.renderer, map2d:!!this.mapCard, rooms:getRoomTargets(this.h,this.config?.entity,this.config?.room_selection===true).length>0
     }));
     this.$("select").onchange = e => this.run("set_fan_speed", e.target.value);
   }

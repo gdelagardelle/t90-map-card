@@ -133,6 +133,8 @@ export function reportPanel(getReport) {
 
 export function attachReport(card, container, kind, getConfig, getLive) {
   const panel=reportPanel(()=>capabilities(kind,card.h,getConfig() || {},getLive?.(),describeCommand(card,getConfig()?.entity)));
+  const refreshSnapshot=panel.update;
+  panel.update=()=>{describeCommand(card,getConfig()?.entity);refreshSnapshot();};
   container.append(panel);
   return panel;
 }
@@ -194,7 +196,12 @@ function editorClass(kind, adapter) {
           if(this.request===request)throw Error();
           return;
         }
-        this.previewURL=result.url;this.info=result.info;box.replaceChildren(result.view);
+        this.previewURL=result.url;box.replaceChildren(result.view);
+        if(result.view.localName==='switchbot-floorplan-beta' && !result.view.renderer){
+          box.replaceChildren();
+          throw Error();
+        }
+        this.info=result.info;
         status.textContent=result.info.map2d?'2D map image available.':'Floor layout available for 3D rendering.';
       }catch{
         if(this.request===request)status.textContent='Map preview unavailable. Check the selected source and device in Home Assistant.';

@@ -58,6 +58,11 @@ try{
       const original=config;
       editor.setConfig({...config,floor_plan:{rooms:[]},map_entity:undefined});editor.hass=hass;
       const locked=editor.shadowRoot.textContent.includes('Your YAML floor plan is active.');
+      if(locked){
+        const check=editor.shadowRoot.querySelector('button');check.click();
+        while(check.disabled)await new Promise(resolve=>setTimeout(resolve,15));
+        if(!editor.shadowRoot.textContent.includes('Map preview unavailable'))throw Error('Invalid plan reported as renderable');
+      }
       const card=new Card();
       card.setConfig({});card.hass=hass;
       const cardReport=[...card.shadowRoot.querySelectorAll('details')].find(p=>p.querySelector('summary')?.textContent==='Test details');
