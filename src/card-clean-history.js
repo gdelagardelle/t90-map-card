@@ -123,7 +123,10 @@ export function mountCardHistory(card) {
     if (Math.max(history.last?.endedAt || 0,device?.endedAt || 0)>now-30*60000) return;
     const token=readToken={}, vacuum=card.vacuum;
     const begin=new Date(now-48*3600000).toISOString();
-    const path='history/period/'+begin+'?filter_entity_id='+encodeURIComponent(vacuum)+'&minimal_response&no_attributes';
+    // HA defaults to one day after the start if the end of the period is omitted.
+    const query=new URLSearchParams({filter_entity_id:vacuum,end_time:new Date(now).toISOString(),
+      minimal_response:'',no_attributes:''});
+    const path='history/period/'+begin+'?'+query;
     Promise.resolve().then(()=>card.h.callApi('GET',path)).then(rows=>{
       if (token!==readToken || !card.isConnected) return;
       recorder=lastRecordedRun(rows,vacuum,now);

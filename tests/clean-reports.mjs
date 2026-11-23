@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {lastRecordedRun,lastDeviceReport,newestClean} from '../src/card-clean-history.js';
+import {mountCardHistory,lastRecordedRun,lastDeviceReport,newestClean} from '../src/card-clean-history.js';
 
 const now=Date.now(), vacuum='vacuum.fictional';
 const iso=t=>new Date(t).toISOString();
@@ -26,3 +26,30 @@ const local={firstSeenAt:now-350000,endedAt:now-5000,route:{},requestedRooms:['K
 assert.equal(newestClean(local,rr).route,local.route);
 assert.equal(newestClean(local,{...rr,startedAt:now-4000}).route,null);
 console.log('Passed device and recorder last-job timestamps, gaps, elapsed time, and separate room/route attribution.');
+
+// Exercise the same request a newly opened card makes on a recorder-backed dashboard.
+globalThis.document={hidden:false};
+const testHistory=rows(['docked','cleaning','returning','docked']);
+let url, shown, count=0;
+const card={vacuum,scope:'floor',isConnected:true,id:(domain,key)=>domain+'.'+key,
+  lastCleanPanel:{stop(){},update(record){shown=record;}},
+  h:{states:{[vacuum]:{state:'docked'}},callApi:async(method,path)=>{
+    assert.equal(method,'GET');
+    url=new URL(path,'http://ha.local/');count++;return testHistory;
+  }}};
+const bridge=mountCardHistory(card);
+bridge.attach(card.scope);
+bridge.refresh();bridge.refresh();
+await new Promise(resolve=>setTimeout(resolve,0));
+assert.equal(count,1);
+assert.equal(url.searchParams.get('filter_entity_id'),vacuum);
+const end=Date.parse(url.searchParams.get('end_time'));
+const begin=Date.parse(url.pathname.split('/').pop());
+assert.ok(Math.abs(Date.now()-end)<5000);
+assert.equal(end-begin,48*3600000);
+assert.equal(shown.recorderOnly,true);
+assert.equal(shown.endedAt,now-60000);
+assert.equal(shown.route,null);
+bridge.detach();
+delete globalThis.document;
+console.log('Verified the displayed recorder report uses a 48-hour window ending now.');
