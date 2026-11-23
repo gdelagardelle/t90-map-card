@@ -4,6 +4,8 @@ Turn your Ecovacs Deebot T90’s own map into an editable 3D floor plan in Home 
 
 ![T90 dashboard showing the robot, a furnished 3D floor plan, and Kitchen and Living room selected](docs/dashboard.png)
 
+![Night appearance with the robot controls beside the floor plan](docs/dashboard-night.png)
+
 ## Before installing
 
 - Connect your T90 through the [Home Assistant Ecovacs integration](https://www.home-assistant.io/integrations/ecovacs/). Finish mapping at least one room in the Ecovacs app.
@@ -37,6 +39,10 @@ map_entity: image.my_deebot_map
 
 Both fields are required. No token or external map URL is needed. For a second robot, add another card and select that device’s vacuum and image.
 
+## Map appearance
+
+Choose **Daylight** or **Night** at the top of the card. Daylight pairs a pale marble map with the cleaning controls below it. Night uses cooler shadows and amber lighting, with the robot alongside the map on wide dashboards. The choice is remembered in this browser for the configured vacuum and map. You can switch while editing or tracking a cleaning run.
+
 ## Clean rooms
 
 Tap a room on the floor. On the first tap, choose its Ecovacs room name and select **Save room**. Repeat for each room you want to target. Once a room is matched, tapping it toggles its highlight. You can also select rooms under **Choose rooms**.
@@ -58,6 +64,8 @@ The glowing marker follows the latest reported position. The card checks the map
 | **Edit furnishings → Add furniture** | Choose an item and tap its position |
 | Drag a piece, its corner, or its ↻ handle | Moves, resizes, or rotates the furnishing |
 | **Done → Lock layout** | Hides geometry editing on this browser and leaves room selection available |
+
+The furniture palette includes an **office desk** with a monitor, a separate **office chair**, a **potted plant**, a **floor lamp**, and an **LED strip**. Stretch the strip lengthwise with the resize handles. The strip glows along its full length, including the ends. The floor lamp casts a softer circular pool. Both effects are stronger in Night. They are visual furnishings and do not send commands to a physical light.
 
 Lengths use the map’s coordinate system. Physical calibration is deferred. Edits customize the dashboard drawing. The robot continues to navigate with its Ecovacs map. New installations start with an unfurnished floor.
 

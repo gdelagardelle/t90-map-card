@@ -8,6 +8,14 @@ import { setupWallEditor } from './ecovacs-wall-editor.js';
 import { RunTrail } from './ecovacs-run-trail.js';
 import { scan, scope } from './scene-context.js';
 
+let lightScene;
+window.t90SetAppearance = look => {
+  const night = look === 'night';
+  document.documentElement.dataset.appearance = night ? 'night' : 'daylight';
+  lightScene?.(night);
+};
+window.t90SetAppearance(window.frameElement.t90Map.appearance);
+
 const viewer = document.querySelector('.viewer');
 const notice = document.querySelector('.notice');
 const compare = new Image();
@@ -525,7 +533,8 @@ function renderPreview() {
   const ground = addMesh(scene, new THREE.PlaneGeometry(1550, 1550), underlay, 0, -7.1, 0);
   ground.rotation.x = -Math.PI / 2;
   ground.castShadow = false;
-  scene.add(new THREE.HemisphereLight(0xf6efea, 0x8b8188, 1.7));
+  const ambient = new THREE.HemisphereLight();
+  scene.add(ambient);
   const key = new THREE.DirectionalLight(0xffead8, 2.5);
   key.position.set(-190, 265, -142);
   key.castShadow = true;
@@ -734,9 +743,9 @@ function renderPreview() {
   glowCanvas.width = glowCanvas.height = 128;
   const ctx = glowCanvas.getContext('2d');
   const glow = ctx.createRadialGradient(64,64,12,64,64,64);
-  glow.addColorStop(0, 'rgba(80,255,240,.88)');
-  glow.addColorStop(.52, 'rgba(69,243,238,.50)');
-  glow.addColorStop(1, 'rgba(24,213,220,0)');
+  glow.addColorStop(0, 'rgba(255,255,255,.88)');
+  glow.addColorStop(.52, 'rgba(255,255,255,.50)');
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0,0,128,128);
   const beacon = new THREE.Group();
@@ -753,6 +762,31 @@ function renderPreview() {
   ring.renderOrder = 3;
   ring.castShadow = false;
   beacon.visible = false;
+  const setRoomLighting = setupRoomPicking({
+    canvas: renderer.domElement, camera, floors: selectableFloors, marble, side, viewer, draw
+  });
+  lightScene = night => {
+    ambient.color.setHex(night ? 0x9cacce : 0xfff2df);
+    ambient.groundColor.setHex(night ? 0x5a4b45 : 0xc6ae94);
+    ambient.intensity = night ? 0.65 : 1.12;
+    key.color.setHex(night ? 0xd1dcfa : 0xffe9cc);
+    key.intensity = night ? 1.15 : 2.6;
+    fill.intensity = night ? 0.47 : 0.72;
+    wallMaterial.color.setHex(night ? 0xa99e96 : 0xd2bda9);
+    wallCap.color.setHex(night ? 0xe3d2bc : 0xf2e1ca);
+    marble.color.setHex(night ? 0xa7afb5 : 0xf6eee1);
+    underlay.opacity = night ? 0.32 : 0.14;
+    routeMaterial.color.setHex(night ? 0xffc071 : 0xa54625);
+    routeHalo.color.copy(routeMaterial.color);
+    routeHalo.opacity = night ? 0.30 : 0.11;
+    ring.material.color.setHex(night ? 0xffdfa1 : 0xcc5527);
+    halo.material.color.copy(ring.material.color);
+    halo.material.opacity = night ? 0.94 : 0.53;
+    furnishings.setLighting(night);
+    setRoomLighting(night);
+    draw();
+  };
+  window.t90SetAppearance(window.frameElement.t90Map.appearance);
   const trail = new RunTrail(localStorage, scope + ':trail');
   const parseTrail = d => d && /^[MmZzLlHhVvCcSsQqTtAaEe.,+\s0-9-]+$/.test(d)
     ? new SVGLoader().parse('<svg xmlns="http://www.w3.org/2000/svg"><path transform="scale(0.2-0.2)" d="' + d + '"/></svg>').paths[0] : null;
@@ -800,7 +834,6 @@ function renderPreview() {
     updateStatus();
     draw();
   };
-    setupRoomPicking({canvas: renderer.domElement, camera, floors: selectableFloors, marble, side, viewer, draw});
 
     const hasLayout = [scope + ':furniture',scope + ':walls'].some(key => localStorage.getItem(key));
     if (!hasLayout) {

@@ -15,5 +15,7 @@ export const furniture = [
   ['cabinets',46,15,0], ['island',45,38,0], ['stool',38,49,0], ['stool',47,49,0],
   ['rug',55,101,0], ['sectional',51,118,0], ['coffee',54,98,0], ['media',48,69,0],
   ['queen',144,33,0], ['smallCabinet',119,21,0], ['smallCabinet',168,21,0],
-  ['dining',155,91,0], ['tallCabinet',173,124,0]
+  ['dining',155,91,0], ['tallCabinet',173,124,0],
+  ['officeDesk',148,125,0], ['officeChair',148,112,0], ['plant',133,128,0],
+  ['floorLamp',115,117,0], ['ledStrip',45,23,0]
 ].map(([kind,x,z,rotation],i) => ({id:i+1,kind,x,z,rotation,width:100,depth:100}));

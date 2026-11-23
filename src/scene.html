@@ -309,7 +309,35 @@
       .tools button { font-size: 14px; padding-inline: 10px; }
     }
   </style>
-<style>body{padding:16px;display:block;min-height:0}h1{font-size:26px}.stage{display:block}.viewer{height:clamp(295px,63vh,560px)}.device{display:block;padding:7px;border:0}.device>div:not(.tools),footer{display:none}.tools{display:flex;gap:5px;flex-wrap:wrap}.tools button{display:inline-grid;grid-auto-flow:column;grid-auto-columns:max-content;align-items:center;justify-content:center;gap:8px;flex:none;width:max-content;min-height:40px;padding:7px 12px;font-size:13px;white-space:nowrap}.tools .switch{width:28px;height:16px;margin:0}.tools{gap:8px}header{margin-bottom:10px}header nav button{min-height:36px;padding:5px 9px} @media(max-width:650px){header{gap:6px}.viewer{height:55vh}}</style></head>
+<style>
+    /* APPEARANCE */
+    :root { --quiet:var(--dim); --line:var(--edge); --amber:var(--accent); color:var(--ink); background:var(--paper) }
+    body { padding:16px; display:block; min-height:100dvh; background:var(--map-surface) }
+    main { display:grid; grid-template-rows:auto minmax(0,1fr); height:calc(100dvh - 32px) }
+    h1 { font:normal clamp(28px,4vw,46px)/1.04 "Iowan Old Style",Georgia,serif; letter-spacing:-.045em }
+    :root[data-appearance=night] h1 { font-family:inherit; font-weight:650 }
+    header { align-items:center; gap:8px 14px; margin-bottom:10px }
+    header nav button { min-height:36px; padding:6px 12px; border-radius:22px }
+    button,select,.furnishing-palette,.edit-selection,.edit-status { background:var(--paper); color:var(--ink) }
+    button[aria-pressed=true],button:hover:enabled { background:var(--selected); color:var(--accent); border-color:var(--accent) }
+    .stage,.stage[data-editing=true] { display:grid; grid-template:"map" minmax(225px,1fr) "device" auto / minmax(0,1fr); gap:4px }
+    .stage .viewer,.stage[data-editing=true] .viewer { min-height:0; height:100%; background:transparent; border:0 }
+    .device { display:block; padding:8px 0; border:0; background:transparent }
+    .device>div:not(.tools),footer { display:none }
+    .notice { background:var(--paper); color:var(--ink); border-radius:8px; padding:8px }
+    .dock-pin { background:var(--paper); color:var(--ink); border-color:var(--accent) }
+    .tools { display:flex; gap:8px; flex-wrap:wrap }
+    .tools button { display:inline-flex; justify-content:center; min-height:40px; padding:7px 12px; font-size:13px; white-space:nowrap }
+    .tools .switch { width:28px; height:16px; margin:0 }
+    .tools button[aria-pressed=true] .switch { background:var(--accent); border-color:var(--accent) }
+    .tools button[aria-pressed=true] .switch::before { background:var(--paper) }
+    @media(max-width:650px) {
+      body { padding:12px }
+      main { height:calc(100dvh - 24px) }
+      header nav { gap:4px }
+      header nav button { font-size:13px; padding:5px 8px }
+    }
+  </style></head>
 <body>
   <main>
     <header>

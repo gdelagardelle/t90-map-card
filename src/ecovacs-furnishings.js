@@ -3,6 +3,11 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 const catalog = {
+  officeDesk: { label: 'Office desk', width: 28, depth: 14 },
+  officeChair: { label: 'Office chair', width: 11, depth: 11 },
+  floorLamp: { label: 'Floor lamp', width: 8, depth: 8 },
+  ledStrip: { label: 'LED strip', width: 24, depth: 1.6 },
+  plant: { label: 'Potted plant', width: 13, depth: 13 },
   rug: { label: 'Area rug', width: 42, depth: 28 },
   cabinets: { label: 'Kitchen cabinets', width: 48, depth: 10 },
   island: { label: 'Kitchen island', width: 29, depth: 13 },
@@ -268,7 +273,98 @@ function buildPrototypes(addMesh, makeMaterial, marbleMap) {
 
   makeBed(groups.queen, 35.7, 44, sage, [-22.8, 22.8]);
   makeBed(groups.single, 22, 42, slate, [15.2]);
-  return groups;
+  const desk = groups.officeDesk;
+  block(desk, oak, 28, 0.85, 14, 0, 9.3, 0, 0.35);
+  for (const x of [-12, 12]) {
+    for (const z of [-5.5, 5.5]) block(desk, dark, 0.7, 9, 0.7, x, 4.5, z);
+  }
+  block(desk, steel, 5, 0.35, 3, 0, 9.9, -3);
+  block(desk, steel, 1, 2.7, 0.65, 0, 11, -3);
+  block(desk, dark, 12, 6.5, 0.65, 0, 14.1, -3);
+  block(desk, slate, 11.4, 5.7, 0.12, 0, 14.2, -2.64);
+  block(desk, dark, 7.8, 0.26, 2.7, 0, 9.87, 2.2);
+
+  const chair = groups.officeChair;
+  for (let i = 0; i < 5; i++) {
+    const angle = i * 2 * Math.PI / 5;
+    const arm = block(chair, steel, 0.65, 0.52, 4.2,
+      2.1 * Math.sin(angle), 1, 2.1 * Math.cos(angle));
+    arm.rotation.y = angle;
+    addMesh(chair, new THREE.SphereGeometry(0.7, 10, 8), dark,
+      4.2 * Math.sin(angle), 0.72, 4.2 * Math.cos(angle));
+  }
+  addMesh(chair, new THREE.CylinderGeometry(0.65, 0.8, 4, 12), steel, 0, 3, 0);
+  block(chair, slate, 8.4, 1.25, 8, 0, 5.5, 0, 0.55);
+  block(chair, slate, 8.1, 7.2, 1.5, 0, 9.2, -3.7, 0.68).rotation.x = -0.09;
+  for (const x of [-4.5, 4.5]) {
+    block(chair, steel, 0.4, 2.4, 0.5, x, 6.6, 0);
+    block(chair, dark, 1, 0.6, 4.4, x, 7.9, 0);
+  }
+
+  const lamp = groups.floorLamp;
+  const brass = makeMaterial(0xa48455, { metalness: 0.6, roughness: 0.38 });
+  addMesh(lamp, new THREE.CylinderGeometry(2.9, 3.1, 0.65, 32), brass, 0, 0.34, 0);
+  addMesh(lamp, new THREE.CylinderGeometry(0.27, 0.33, 15, 12), brass, 0, 8, 0);
+  const shade = makeMaterial(0xffe8c4, { emissive: 0xffbd73, side: THREE.DoubleSide });
+  addMesh(lamp, new THREE.CylinderGeometry(2.8, 4, 5.6, 36, 1, true), shade, 0, 15.6, 0);
+  addMesh(lamp, new THREE.SphereGeometry(1.1, 16, 12), shade, 0, 15, 0);
+
+  const strip = groups.ledStrip;
+  const diffuser = makeMaterial(0xfff0cd, { emissive: 0xffc587 });
+  block(strip, steel, 24, 0.56, 1.6, 0, 0.3, 0);
+  block(strip, diffuser, 23.7, 0.32, 1.28, 0, 0.68, 0);
+
+  // Distance to a line segment gives the strip even spill with rounded ends.
+  // A zero-length segment gives the lamp a circular pool. Clones share both textures.
+  function addLightPool(group, length, radius, color) {
+    const width = length + 2 * radius, depth = 2 * radius;
+    const rows = 64, columns = Math.ceil(rows * width / depth);
+    const pixels = new Uint8Array(columns * rows * 4);
+    for (let y = 0; y < rows; y++) {
+      const z = ((y + 0.5) / rows - 0.5) * depth;
+      for (let x = 0; x < columns; x++) {
+        const along = Math.abs(((x + 0.5) / columns - 0.5) * width);
+        const beyondEnd = Math.max(0, along - length / 2);
+        const fade = Math.max(0, 1 - Math.hypot(beyondEnd, z) / radius);
+        pixels.set([255, 255, 255, Math.round(255 * fade * fade)], 4 * (y * columns + x));
+      }
+    }
+    const map = new THREE.DataTexture(pixels, columns, rows);
+    map.magFilter = map.minFilter = THREE.LinearFilter;
+    map.needsUpdate = true;
+    const material = new THREE.MeshBasicMaterial({
+      map, color, transparent: true, depthWrite: false, toneMapped: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const glow = addMesh(group, new THREE.PlaneGeometry(width, depth), material, 0, 0.23, 0);
+    glow.rotation.x = -Math.PI / 2;
+    glow.castShadow = glow.receiveShadow = false;
+    glow.userData.lightPool = true;
+    return material;
+  }
+  const lampPool = addLightPool(lamp, 0, 13, 0xffcc91);
+  const stripPool = addLightPool(strip, 23.7, 6.4, 0xffc778);
+
+  const plant = groups.plant;
+  addMesh(plant, new THREE.CylinderGeometry(3.1, 2.35, 5, 32), stone, 0, 2.5, 0);
+  addMesh(plant, new THREE.CylinderGeometry(2.8, 2.8, 0.2, 24), walnut, 0, 5, 0);
+  const leaves = [makeMaterial(0x425e40), makeMaterial(0x738653), makeMaterial(0x567650)];
+  const leaf = new THREE.SphereGeometry(1, 14, 10);
+  for (let i = 0; i < 12; i++) {
+    const angle = i * 2.4, height = 8 + i % 4 * 1.5;
+    const direction = new THREE.Vector3(Math.sin(angle), 1.15 + i % 3 * 0.3, Math.cos(angle)).normalize();
+    const blade = addMesh(plant, leaf, leaves[i % 3], 2.6 * Math.sin(angle), height, 2.6 * Math.cos(angle));
+    blade.scale.set(1.6, 4.6, 0.64);
+    blade.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+  }
+
+  function setLighting(night) {
+    shade.emissiveIntensity = night ? 2.15 : 0.30;
+    diffuser.emissiveIntensity = night ? 5 : 2.2;
+    lampPool.opacity = night ? 0.68 : 0.22;
+    stripPool.opacity = night ? 0.96 : 0.52;
+  }
+  return { groups, setLighting };
 }
 
 function pointInPolygon({ x, y }, polygon) {
@@ -345,7 +441,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   const layer = new THREE.Group();
   model.add(layer);
   const objects = new Map();
-  const prototypes = buildPrototypes(addMesh, makeMaterial, marbleMap);
+  const { groups: prototypes, setLighting } = buildPrototypes(addMesh, makeMaterial, marbleMap);
   const boundary = floors.flatMap(path => path.toShapes().map(shape => shape.extractPoints(1)));
   const ray = new THREE.Raycaster();
   const cursor = new THREE.Vector2();
@@ -699,7 +795,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   }
 
   function pickItem() {
-    let object = ray.intersectObjects(layer.children, true)[0]?.object;
+    let object = ray.intersectObjects(layer.children, true).find(hit => !hit.object.userData.lightPool)?.object;
     while (object && object.parent !== layer) object = object.parent;
     const id = object?.userData.furnishingId;
     return items.find(item => item.id === id);
@@ -953,6 +1049,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   for (const item of items) applyItem(item);
   viewer.dataset.furnishings = String(items.length);
   return {
+    setLighting,
     refreshHandles,
     handleKey(event) {
       if (editor.hidden) return false;

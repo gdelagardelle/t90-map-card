@@ -1,4 +1,6 @@
 import './editor.js';
+import palette from './appearance.css';
+import cardStyles from './card.css';
 import sceneDocument from 't90-scene';
 import { parseT90Map } from './map.js';
 const title = s => String(s || '').replaceAll('_',' ').replace(/^./, c => c.toUpperCase());
@@ -87,36 +89,24 @@ class T90MapCard extends HTMLElement {
     this.generation++;
     this.abort?.abort();
   }
+  setAppearance(look) {
+    this.dataset.appearance = look === 'night' ? 'night' : 'daylight';
+    for (const button of this.shadowRoot.querySelectorAll('[data-look]')) {
+      button.setAttribute('aria-pressed', String(button.dataset.look === this.dataset.appearance));
+    }
+    if (this.frame.t90Map) this.frame.t90Map.appearance = this.dataset.appearance;
+    this.frame.contentWindow?.t90SetAppearance?.(this.dataset.appearance);
+  }
   build() {
-    this.shadowRoot.innerHTML = `<style>
-    :host{display:block;color:#f5eee7;--edge:#483d33;--dim:#c1b7ad;color-scheme:dark}
-    *{box-sizing:border-box} ha-card{display:block;overflow:hidden;color:inherit;background:#171717;border:1px solid var(--edge);border-radius:18px}
-    iframe{display:block;width:100%;height:clamp(450px,64vh,740px);border:0;background:#141414}
-    .panel{padding:clamp(16px,3vw,32px);display:grid;gap:16px} h2,h3,p{margin:0} h2{font-size:24px} .line,.actions,.chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .line{justify-content:space-between}.vitals,small,.note{color:var(--dim)} button,select,input[type=file]::file-selector-button{font:inherit;border-radius:8px;color:inherit;background:#262421;border:1px solid var(--edge);padding:9px 13px;min-height:42px}
-    button,summary,select{cursor:pointer}button:focus-visible,select:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid #ffd19c;outline-offset:2px}
-    button:disabled,select:disabled{opacity:.45;cursor:default}.primary{color:#21150c;background:#f4bc83;border-color:#f4bc83;font-weight:650}
-    .chips button{font-size:14px;border-radius:18px;padding:6px 12px;min-height:36px}.chips [aria-pressed=true]{background:#4c3321;border-color:#e3a565;color:#ffddb5}
-    details{border-top:1px solid var(--edge);padding-top:12px}summary{font-weight:600;min-height:32px}.content{display:grid;gap:12px;margin:8px 0}
-    .settings,.readings{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(235px,100%),1fr));gap:8px 20px}
-    .setting,.reading{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0}.setting select{max-width:59%}
-    .reading{border:0;border-bottom:1px solid var(--edge);background:transparent;text-align:left;border-radius:0}.reading span:last-child{color:#f4ceaa}
-    .alert{padding:12px 14px;background:#3c2c1c;border:1px solid #8d6845;border-radius:8px;white-space:pre-wrap}
-    [hidden]{display:none!important} [role=status]:empty{display:none} .muted{color:var(--dim);font-size:14px} @media(max-width:650px){iframe{height:520px}.panel{padding:16px}}
-    .cockpit{container-type:inline-size;background:radial-gradient(ellipse at top left,#2b221b,#141414 75%)}
-    .map-row{display:grid;grid-template-columns:minmax(215px,24%) minmax(0,1fr);align-items:center}
-    .robot-panel{padding:clamp(16px,2vw,30px);display:grid;gap:10px}
-    .robot-panel h2{letter-spacing:-.03em}.robot-panel img{display:block;width:100%;max-width:250px;justify-self:center}
-    dialog{width:min(360px,calc(100vw - 32px));padding:22px;border:1px solid #706151;color:#fff4e9;background:#25211e;border-radius:15px}
-    dialog::backdrop{background:#09090999}dialog select{display:block;width:100%;margin:12px 0}
-    .target{font-size:14px;color:#b6ebdf;line-height:1.4}.main-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-    .main-actions button{min-width:0;padding:9px 5px;overflow-wrap:anywhere}.main-actions [data-action=start]{grid-column:1/-1}.main-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
-    @container(max-width:780px){.map-row{grid-template-columns:minmax(0,1fr)}.robot-panel{grid-template-columns:minmax(0,1fr) 110px;gap:5px 9px}
-    .robot-panel img{grid-column:2;grid-row:1/4;width:110px}.robot-panel .target{grid-column:1}.main-actions{grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:6px}}
-    </style><ha-card><div class="cockpit"><div class="map-row"><aside class="robot-panel" aria-label="Deebot controls">
-    <h2>Deebot T90</h2><span class="vitals"></span><img alt="Deebot T90 robot preview" hidden>
-    <p class="target" aria-live="polite">Whole home</p><div class="actions main-actions"></div></aside>
-    <iframe title="Live 3D Deebot map"></iframe></div></div><section class="panel">
+    this.shadowRoot.innerHTML = `<style>${palette}
+${cardStyles}</style>
+    <ha-card><div class="cockpit"><div class="appearance"><span>Map appearance</span>
+    <div class="picker" role="group" aria-label="Map appearance"><button type="button" data-look="daylight">Daylight</button><button type="button" data-look="night">Night</button></div></div>
+    <div class="map-row"><iframe title="Live 3D Deebot map"></iframe>
+    <aside class="robot-panel" aria-label="Deebot controls"><img alt="Deebot T90 robot preview" hidden>
+    <div class="identity"><h2>Deebot T90</h2><span class="vitals"></span></div>
+    <div class="targetbox"><span class="target-label">Cleaning target</span><p class="target" aria-live="polite">Whole home</p></div>
+    <div class="actions main-actions"></div></aside></div></div><section class="panel">
     <details class="rooms"><summary>Choose rooms · Whole home</summary><div class="content"><div class="chips"></div><button class="reassign" type="button">Change a map room name</button></div></details>
     <details open><summary>Cleaning settings</summary><div class="content settings"></div></details>
     <details><summary>Dock and maintenance</summary><div class="content"><div class="actions station"></div><div class="readings"></div></div></details>
@@ -129,6 +119,16 @@ class T90MapCard extends HTMLElement {
     this.ui = this.shadowRoot.querySelector('.panel');
     this.frame = this.shadowRoot.querySelector('iframe');
     this.q = sel => this.shadowRoot.querySelector(sel);
+    const preferenceKey = 't90:' + this.vacuum + ':' + this.image + ':appearance';
+    let look;
+    try { look = localStorage.getItem(preferenceKey); } catch { /* Storage is optional. */ }
+    this.setAppearance(look);
+    for (const button of this.shadowRoot.querySelectorAll('[data-look]')) {
+      button.onclick = () => {
+        this.setAppearance(button.dataset.look);
+        try { localStorage.setItem(preferenceKey, button.dataset.look); } catch { /* Session only. */ }
+      };
+    }
     this.frame.addEventListener('load', () => { this.mapVersion='';
       const portrait=this.frame.contentDocument?.querySelector('.product img');
       if(portrait?.src) {
@@ -181,7 +181,7 @@ class T90MapCard extends HTMLElement {
     this.selectedRooms.clear();
     this.pendingRegion = null;
     this.q('dialog').close();
-    this.frame.t90Map = { scan: map.svg, scope };
+    this.frame.t90Map = { scan: map.svg, scope, appearance: this.dataset.appearance };
     this.installSavedLayout();
     this.frame.srcdoc = sceneDocument;
     this.note('');
