@@ -194,6 +194,17 @@
       border-radius: 12px;
       background: #211e1b;
     }
+    #furnishing-editor .editor-top:has(.furnishing-palette:not([hidden])) { bottom:14px; align-content:flex-start; z-index:4; }
+    #furnishing-palette { max-height:min(367px,calc(100% - 52px)); grid-template-columns:1fr; padding:12px; }
+    .furniture-room { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
+    .furniture-room h3 { grid-column:1 / -1; margin:5px 0 2px; font-size:13px; color:var(--dim); }
+    .furniture-colors { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:4px; }
+    .furniture-colors .swatch { width:31px; height:31px; min-height:31px; padding:4px; }
+    .swatch span, .finish-chip { display:inline-block; width:17px; height:17px; border-radius:50%; background:var(--finish); border:1px solid currentColor; vertical-align:middle; }
+    .finish-chip { margin-right:5px; }
+    .furniture-colors .swatch[aria-pressed=true] { outline:2px solid var(--accent); outline-offset:0; }
+    .furniture-colors label { display:inline-flex; align-items:center; gap:5px; }
+    .furniture-colors input { width:34px; height:31px; padding:2px; cursor:pointer; }
     .furnishing-palette button { padding-inline: 9px; text-align: left; }
     .editor-bottom { bottom: 14px; display: grid; justify-items: center; gap: 7px; }
     .edit-selection {
@@ -373,9 +384,15 @@
                 <button type="button" data-furnishing="rotate">Rotate</button>
                 <button type="button" data-furnishing="flip-chaise" hidden>Flip chaise</button>
                 <button type="button" data-furnishing="resize" aria-expanded="false" aria-controls="furnishing-size">Resize</button>
+                <button type="button" data-furnishing="color" aria-expanded="false" aria-controls="furniture-colors"><span class="finish-chip" aria-hidden="true"></span>Color</button>
                 <button type="button" data-furnishing="remove">Remove</button>
               </div>
+              <div class="furniture-colors" id="furniture-colors" role="group" aria-label="Furniture color" hidden>
+                <label>Custom <input type="color" aria-label="Custom furniture color"></label>
+                <button type="button" data-furnishing="original">Original color</button>
+              </div>
               <div class="furnishing-size" id="furnishing-size" hidden>
+                <label><input type="checkbox" data-lock-ratio checked> Keep proportions</label>
                 <label class="size">
                   Width<input type="range" min="50" max="400" step="5" value="100" aria-label="Width">
                   <output>100%</output>

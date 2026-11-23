@@ -1,8 +1,23 @@
+import { proportionalSize,sizeEquipment } from './furniture-scale.js';
 import { scope } from './scene-context.js';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 const catalog = {
+  nightstand:{label:'Bedside table',width:11,depth:9},
+  shoeCabinet:{label:'Shoe cabinet',width:20,depth:7},
+  sideTable:{label:'Round side table',width:11,depth:11},
+  diningChair:{label:'Dining chair',width:8,depth:9},
+  range:{label:'Oven and hob',width:13,depth:12},
+  coatRack:{label:'Coat rack',width:9,depth:9},
+  armchair: { label: 'Armchair', width: 16, depth: 16 },
+  ottoman: { label: 'Round ottoman', width: 13, depth: 13 },
+  bookcase: { label: 'Bookcase', width: 21, depth: 7 },
+  dresser: { label: 'Dresser', width: 22, depth: 10 },
+  console: { label: 'Low media console', width: 30, depth: 8 },
+  bench: { label: 'Entry bench', width: 24, depth: 9 },
+  compactFridge: { label: 'Retro refrigerator', width: 11, depth: 11 },
+  dishwasher: { label: 'Dishwasher', width: 12, depth: 12 },
   officeDesk: { label: 'Office desk', width: 28, depth: 14 },
   officeChair: { label: 'Office chair', width: 11, depth: 11 },
   floorLamp: { label: 'Floor lamp', width: 8, depth: 8 },
@@ -28,6 +43,18 @@ const catalog = {
   bathSink: { label: 'Bathroom sink', width: 15, depth: 8.6 },
   bathtub: { label: 'Bathtub', width: 13, depth: 31 },
 };
+
+const rooms = {
+  'Living room': ['sofa','sectional','armchair','ottoman','sideTable','coffee','media','console','bookcase','rug'],
+  'Kitchen & dining': ['cabinets','island','stool','dining','diningChair','range','fridge','compactFridge','dishwasher'],
+  Bedroom: ['queen','single','nightstand','dresser'],
+  'Entry & storage': ['bench','shoeCabinet','coatRack','smallCabinet','tallCabinet'],
+  Office: ['officeDesk','officeChair'],
+  'Bath & laundry': ['toilet','bathSink','bathtub','washer','dryer'],
+  'Lighting & plants': ['floorLamp','ledStrip','plant'],
+};
+const swatches = { Chalk:'#e8e4db', Sand:'#c6ae91', Walnut:'#865a40', Clay:'#ac6654',
+  Sage:'#768474', Navy:'#455e77', Charcoal:'#404448' };
 
 const storageKey = scope + ':furniture';
 
@@ -227,14 +254,21 @@ function buildPrototypes(addMesh, makeMaterial, marbleMap) {
   block(bathtub, steel, 0.58, 1.8, 0.58, 0, 7.21, -13.35, 0.12);
   block(bathtub, steel, 0.61, 0.42, 2.8, 0, 8.06, -12.41, 0.15);
 
+  function equipment(parent,top,widthClearance,depthClearance){
+    const group=new THREE.Group();
+    group.name='equipment';group.position.y=top;
+    Object.assign(group.userData,{widthClearance,depthClearance});
+    parent.add(group);return group;
+  }
   const media = groups.media;
   block(media, walnut, 29.6, 4.2, 6.5, 0, 2.4, 0, 0.22);
   block(media, oak, 29.9, 0.47, 6.9, 0, 4.64, 0, 0.18);
   for (const x of [-9.8, 0, 9.8]) block(media, oak, 9.1, 3.5, 0.31, x, 2.4, 3.26);
-  block(media, dark, 9.3, 0.28, 3.1, 0, 5.0, 0, 0.13);
-  block(media, dark, 2, 1.1, 0.73, 0, 5.49, -0.76);
-  block(media, dark, 23.4, 10.9, 0.67, 0, 10.95, -1.09, 0.21);
-  block(media, slate, 22.4, 10, 0.1, 0, 10.97, -0.71, 0.04);
+  const tv=equipment(media,4.86,29.9/23.4,6.9/3.1);
+  block(tv,dark,9.3,.28,3.1,0,.14,0,.13);
+  block(tv,dark,2,1.1,.73,0,.63,-.76);
+  block(tv,dark,23.4,10.9,.67,0,6.09,-1.09,.21);
+  block(tv,slate,22.4,10,.1,0,6.11,-.71,.04);
 
   const dining = groups.dining;
   const diningTop = addMesh(dining, new THREE.CylinderGeometry(1, 1, 1.15, 64), oak, 0, 8.8, 0);
@@ -278,11 +312,12 @@ function buildPrototypes(addMesh, makeMaterial, marbleMap) {
   for (const x of [-12, 12]) {
     for (const z of [-5.5, 5.5]) block(desk, dark, 0.7, 9, 0.7, x, 4.5, z);
   }
-  block(desk, steel, 5, 0.35, 3, 0, 9.9, -3);
-  block(desk, steel, 1, 2.7, 0.65, 0, 11, -3);
-  block(desk, dark, 12, 6.5, 0.65, 0, 14.1, -3);
-  block(desk, slate, 11.4, 5.7, 0.12, 0, 14.2, -2.64);
-  block(desk, dark, 7.8, 0.26, 2.7, 0, 9.87, 2.2);
+  const monitor=equipment(desk,9.725,28/12,14/9);
+  block(monitor,steel,5,.35,3,0,.175,-3);
+  block(monitor,steel,1,2.7,.65,0,1.275,-3);
+  block(monitor,dark,12,6.5,.65,0,4.375,-3);
+  block(monitor,slate,11.4,5.7,.12,0,4.475,-2.64);
+  block(monitor,dark,7.8,.26,2.7,0,.145,2.2);
 
   const chair = groups.officeChair;
   for (let i = 0; i < 5; i++) {
@@ -358,6 +393,117 @@ function buildPrototypes(addMesh, makeMaterial, marbleMap) {
     blade.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
   }
 
+  const armchair=groups.armchair;
+  for(const x of [-5.4,5.4])for(const z of [-5.4,5.4])block(armchair,walnut,1.2,2.2,1.2,x,1.1,z);
+  block(armchair,linen,15.6,2.8,15.2,0,3.2,0,.8);
+  block(armchair,linen,15.8,7.3,3.3,0,7.2,-6,.85).rotation.x=.10;
+  for(const x of [-6.6,6.6])block(armchair,linen,2.5,4.7,13.4,x,5.8,.6,.8);
+  block(armchair,linen,11,2.2,10.6,0,5,1.4,.82);
+  const ottoman=groups.ottoman;
+  addMesh(ottoman,new THREE.CylinderGeometry(5.2,5.1,1,32),walnut,0,.5,0);
+  addMesh(ottoman,new THREE.CylinderGeometry(6.25,5.9,4.1,40),sage,0,2.95,0);
+  addMesh(ottoman,new THREE.CylinderGeometry(6.25,6.45,1.15,40),sage,0,5.55,0);
+  const bookcase=groups.bookcase;
+  block(bookcase,walnut,20,23,.65,0,11.6,-3.1);
+  for(const x of [-10,10])block(bookcase,oak,.9,23.8,7,x,11.9,0);
+  for(const y of [1,8.2,15.4,23.5])block(bookcase,oak,20.3,.8,7,0,y,0);
+  for(const [x,y,h,mat] of [[-7.4,1.4,5,cushion],[-5.8,1.4,4.6,slate],[-3.9,1.4,5.6,sage],[3.2,8.6,5,slate],[5,8.6,4.5,cotton],[7,8.6,5.4,cushion]]){
+    block(bookcase,mat,1.4,h,4.5,x,y+h/2,.2,.07);
+  }
+  const dresser=groups.dresser;
+  block(dresser,walnut,19,1.2,8.1,0,.65,0);
+  block(dresser,oak,22,11.4,9.2,0,6.9,-.3);
+  for(const y of [3.2,6.9,10.6]){
+    block(dresser,oak,21.3,3.35,.5,0,y,4.45);
+    for(const x of [-6,6])block(dresser,brass,2,.3,.55,x,y+.35,4.79);
+  }
+  const consoleUnit=groups.console;
+  for(const x of [-12.6,12.6])block(consoleUnit,steel,1.1,1.7,5.6,x,.85,0);
+  block(consoleUnit,walnut,29.5,6.1,7.6,0,4.7,-.12);
+  block(consoleUnit,oak,30,.64,8,0,8,0);
+  for(const x of [-10,10]){
+    block(consoleUnit,oak,9.1,5.5,.4,x,4.7,3.7);
+    for(let dx=-3.3;dx<4;dx+=1.1)block(consoleUnit,oak,.45,5.2,.22,x+dx,4.7,3.92,.07);
+  }
+  block(consoleUnit,dark,9.6,4.8,.24,0,4.65,3.74);
+  block(consoleUnit,oak,9.7,.46,.52,0,4.8,3.73);
+  const bench=groups.bench;
+  for(const x of [-9.6,9.6])for(const z of [-3.1,3.1])block(bench,walnut,1.2,5.9,1.2,x,2.95,z);
+  for(const z of [-2.7,0,2.7])block(bench,oak,20.2,.65,1.3,0,2,z);
+  block(bench,oak,24,.95,9,0,6,0,.32);
+  block(bench,linen,23.5,1.45,8.6,0,7.05,0,.58);
+  const enamel=makeMaterial(0x99b5a8,{roughness:.32});
+  const retro=groups.compactFridge;
+  block(retro,dark,9.4,.9,9.4,0,.48,0);
+  block(retro,enamel,10.7,16.6,9.3,0,9.1,-.7,.9);
+  for(const [y,h] of [[6.35,10.65],[14.6,5.15]]){
+    block(retro,enamel,10.7,h,1.65,0,y,4.38,.56);
+    block(retro,steel,.45,2.8,.46,-3.75,y,5.31,.17);
+  }
+  const dishwasher=groups.dishwasher;
+  block(dishwasher,whiteSide,12,12.4,11.1,0,6.28,-.4,.26);
+  block(dishwasher,whiteCabinet,11.7,10.5,.65,0,6.65,5.4,.19);
+  block(dishwasher,dark,11.3,1.25,.45,0,11.65,5.62,.12);
+  block(dishwasher,steel,8,.39,.58,0,10.3,5.68,.12);
+  block(dishwasher,slate,2.1,.42,.12,3.4,11.66,5.86,.04);
+
+  const bedside=groups.nightstand;
+  block(bedside,walnut,9.7,1.1,7.8,0,.55,0);
+  block(bedside,oak,10.8,6.7,8.4,0,4.45,-.12);
+  block(bedside,oak,11,.65,9,0,8,0);
+  block(bedside,dark,9.3,2.3,.2,0,2.8,4.1);
+  block(bedside,oak,10.2,3,.45,0,5.95,4.1);
+  block(bedside,brass,2.6,.27,.38,0,6,4.36);
+  const shoes=groups.shoeCabinet;
+  block(shoes,walnut,18.4,1.2,6,0,.6,0);
+  block(shoes,whiteSide,20,14.6,6.5,0,8.45,-.15);
+  for(const y of [5,12]){
+    block(shoes,whiteCabinet,19.4,6.6,.44,0,y,3.13);
+    block(shoes,oak,7,.42,.44,0,y+2.15,3.36);
+  }
+  const side=groups.sideTable;
+  addMesh(side,new THREE.CylinderGeometry(3.3,4.4,.8,36),walnut,0,.4,0);
+  addMesh(side,new THREE.CylinderGeometry(1,1.8,6.5,32),oak,0,3.9,0);
+  addMesh(side,new THREE.CylinderGeometry(5.4,5.2,.65,40),tableMarble,0,7.4,0);
+  const diningChair=groups.diningChair;
+  for(const x of [-2.8,2.8])for(const z of [-3.1,3.1])block(diningChair,walnut,.65,5.5,.65,x,2.75,z);
+  block(diningChair,oak,7.6,.7,8,0,5.6,0);
+  block(diningChair,linen,7.5,.95,7.5,0,6.3,.1,.4);
+  for(const x of [-3,3])block(diningChair,walnut,.55,5.9,.6,x,8.4,-3.6);
+  block(diningChair,linen,7.8,3.8,1.1,0,10.35,-3.7,.48);
+  const oven=groups.range;
+  block(oven,steel,12.9,12,11.4,0,6.1,-.14,.28);
+  block(oven,dark,11.4,7.8,.5,0,5.2,5.56);
+  block(oven,slate,9.9,5.6,.17,0,5.2,5.85);
+  block(oven,steel,9.2,.42,.65,0,9,5.62);
+  block(oven,dark,12.9,.52,11.7,0,12.25,0);
+  for(const x of [-3.1,3.1])for(const z of [-2.65,2.65])
+    addMesh(oven,new THREE.TorusGeometry(1.75,.13,6,24),steel,x,12.57,z).rotation.x=Math.PI/2;
+  const rack=groups.coatRack;
+  addMesh(rack,new THREE.CylinderGeometry(3.5,4.4,.9,32),dark,0,.48,0);
+  addMesh(rack,new THREE.CylinderGeometry(.55,.75,22,16),oak,0,11.6,0);
+  for(let i=0;i<4;i++){
+    const angle=i*Math.PI/2;
+    const hook=block(rack,oak,.65,.65,4.2,Math.sin(angle)*1.9,17+i,Math.cos(angle)*1.9);
+    hook.rotation.order='YXZ';hook.rotation.y=angle;hook.rotation.x=-.45;
+  }
+
+  // Only the named finish is editable. Hardware, upholstery textures,
+  // light emitters and details continue to use their original materials.
+  const editable={
+    nightstand:[oak],shoeCabinet:[whiteCabinet,whiteSide],sideTable:[tableMarble],diningChair:[linen],range:[steel],coatRack:[oak],
+    armchair:[linen],ottoman:[sage],bookcase:[oak,walnut],dresser:[oak],console:[oak],
+    bench:[linen],compactFridge:[enamel],dishwasher:[whiteCabinet,whiteSide],
+    officeDesk:[oak],officeChair:[slate],floorLamp:[brass],ledStrip:[steel],plant:[stone],
+    rug:[rugInner],cabinets:[whiteCabinet,whiteSide],island:[whiteCabinet,whiteSide],stool:[linen],
+    fridge:[steel],sofa:[linen],sectional:[linen],coffee:[tableMarble],media:[oak,walnut],dining:[oak],
+    queen:[sage],single:[slate],washer:[whiteCabinet],dryer:[whiteCabinet],smallCabinet:[whiteCabinet,whiteSide],
+    tallCabinet:[whiteCabinet,whiteSide],toilet:[porcelain],bathSink:[oak],bathtub:[porcelain],
+  };
+  for(const [kind,group] of Object.entries(groups)){
+    group.traverse(mesh=>{if(editable[kind].includes(mesh.material))mesh.userData.tintable=true;});
+  }
+
   function setLighting(night) {
     shade.emissiveIntensity = night ? 2.15 : 0.30;
     diffuser.emissiveIntensity = night ? 5 : 2.2;
@@ -416,7 +562,7 @@ function limits(item, margin = 0) {
   return corners.map((_,i)=>corners[(i+quadrant)%4]);
 }
 
-export function setupFurnishings({ model, camera, canvas, floors, additionalFloors, addMesh, makeMaterial, marbleMap, render, onEditing }) {
+export function setupFurnishings({ model, camera, canvas, floors, additionalFloors, addMesh, makeMaterial, marbleMap, render, onEditing, storage=localStorage, checkFootprint }) {
   const viewer = canvas.parentElement;
   const stage = viewer.closest('.stage');
   const editor = document.querySelector('#furnishing-editor');
@@ -429,10 +575,24 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   const flipChaiseButton = controls('flip-chaise');
   const sourceButton = document.querySelector('[data-view="source"]');
   const palette = document.querySelector('#furnishing-palette');
+  const colorPanel=editor.querySelector('#furniture-colors'),colorButton=controls('color');
+  const customColor=colorPanel.querySelector('input');
+  for(const [name,color] of Object.entries(swatches)){
+    const button=document.createElement('button');
+    button.type='button';button.className='swatch';button.title=name;button.setAttribute('aria-label',name);
+    button.dataset.color=color;button.style.setProperty('--finish',color);button.append(document.createElement('span'));
+    colorPanel.insertBefore(button,customColor.parentElement);
+    button.onclick=()=>changeColor(color);
+  }
+  customColor.onchange=()=>changeColor(customColor.value);
+  controls('original').onclick=()=>changeColor(null);
+  colorButton.onclick=()=>{showSize(false);showColor(colorPanel.hidden);};
+  const colorBindings=new WeakMap();
   const selection = editor.querySelector('.edit-selection');
   const selectionName = editor.querySelector('.selected-name');
   const size = editor.querySelector('#furnishing-size');
-  const [widthInput, depthInput] = [...size.querySelectorAll('input')];
+  const [widthInput, depthInput] = [...size.querySelectorAll('input[type=range]')];
+  const lockRatio=size.querySelector('[data-lock-ratio]');
   function isDimension(value, input) {
     return Number.isInteger(value) && value >= Number(input.min) && value <= Number(input.max);
   }
@@ -458,6 +618,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
 
   function fits(item) {
     const corners = limits(item, 0.75);
+    if (checkFootprint) return checkFootprint([...corners,{x:item.x,y:item.z}]);
     const axes = footprintAxes(item);
     const center = new THREE.Vector2(item.x,item.z);
     const half = new THREE.Vector2(catalog[item.kind].width*item.width/200+.75,
@@ -475,7 +636,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
 
   function restore() {
     try {
-      const saved = JSON.parse(localStorage.getItem(storageKey));
+      const saved = JSON.parse(storage.getItem(storageKey));
       if (saved?.version === 1 && Array.isArray(saved.items)) {
         const ids = new Set();
         return saved.items.filter(item => {
@@ -484,6 +645,8 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
             !Number.isFinite(item.x) || !Number.isFinite(item.z) ||
             !Number.isFinite(item.rotation) || item.rotation < 0 || item.rotation >= 4 ||
             !isDimension(item.width, widthInput) || !isDimension(item.depth, depthInput) || (!fits(item) && item.kind !== 'coffee')) return false;
+          if(typeof item.color!=='string' || !/^#[0-9a-f]{6}$/i.test(item.color))delete item.color;
+          if(!isDimension(item.height,widthInput))delete item.height;
           ids.add(item.id);
           return true;
         });
@@ -517,6 +680,41 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     });
   }
 
+  // Three.js clones share their prototype materials. Clone only the finish
+  // of a customized piece, retaining the original material for an exact reset.
+  function releaseColor(object){
+    const binding=colorBindings.get(object);
+    if(!binding)return;
+    for(const [mesh,original] of binding.meshes)mesh.material=original;
+    for(const material of binding.materials.values())material.dispose();
+    colorBindings.delete(object);
+  }
+  function applyColor(object,color){
+    if(!color){releaseColor(object);return;}
+    let binding=colorBindings.get(object);
+    if(!binding){
+      binding={meshes:[],materials:new Map()};colorBindings.set(object,binding);
+      object.traverse(mesh=>{
+        if(!mesh.userData.tintable)return;
+        const original=mesh.material;
+        if(!binding.materials.has(original))binding.materials.set(original,original.clone());
+        binding.meshes.push([mesh,original]);mesh.material=binding.materials.get(original);
+      });
+    }
+    if(binding.color===color)return;
+    for(const material of binding.materials.values())material.color.set(color);
+    binding.color=color;
+  }
+  function changeColor(color){
+    const item=current();
+    if(!item || (item.color || null)===color)return;
+    remember();
+    if(color)item.color=color;else delete item.color;
+    applyItem(item);updateSelection();save(color?'Color updated.':'Original color restored.');redraw();
+  }
+  function showColor(visible){
+    colorPanel.hidden=!visible;colorButton.setAttribute('aria-expanded',String(visible));
+  }
   function applyItem(item) {
     let object = objects.get(item.id);
     if (!object) {
@@ -525,10 +723,14 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
       objects.set(item.id, object);
       layer.add(object);
     }
+    applyColor(object,item.color);
     object.position.set(item.x, 0, item.z);
     object.rotation.y = item.rotation * Math.PI / 2;
     const mirrored = item.kind === 'sectional' && item.chaise !== 'left';
-    object.scale.set((mirrored ? -1 : 1) * item.width / 100, 1, item.depth / 100);
+    const width=item.width/100,depth=item.depth/100,height=(item.height ?? 100)/100;
+    object.scale.set(mirrored?-width:width,height,depth);
+    const attached=object.getObjectByName('equipment');
+    if(attached)sizeEquipment(attached,width,height,depth);
   }
 
   function message(text) {
@@ -537,7 +739,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
 
   function save(text) {
     try {
-      localStorage.setItem(storageKey, JSON.stringify({ version: 1, items }));
+      storage.setItem(storageKey, JSON.stringify({ version: 1, items }));
       message(text);
     } catch {
       message(text + ' Browser storage is unavailable.');
@@ -671,6 +873,13 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
         .addScaledVector(axes.depth,sz*spec.depth*d/200);
       return {...item,width:w,depth:d,x:center.x,z:center.y};
     }
+    if(lockRatio.checked){
+      const w0=spec.width*item.width/100,d0=spec.depth*item.depth/100;
+      const scale=(sx*diagonal.dot(axes.width)*w0+sz*diagonal.dot(axes.depth)*d0)/(w0*w0+d0*d0);
+      const size=proportionalSize(item,Math.round(scale*100)/100);
+      const result={...candidate(size.width,size.depth),height:size.height};
+      return fits(result)?result:active.preview;
+    }
     const target = candidate(width,depth);
     if (fits(target)) return target;
     // Walk back to the nearest fitting increment, keeping the far corner anchored.
@@ -695,6 +904,13 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     showGuide(selection.hidden ? null : item);
     if (selection.hidden) return;
     selectionName.textContent = catalog[item.kind].label;
+    const original=prototypes[item.kind].children.find(mesh=>mesh.userData.tintable).material.color;
+    customColor.value=item.color || '#'+original.getHexString();
+    colorButton.style.setProperty('--finish',customColor.value);
+    for(const swatch of colorPanel.querySelectorAll('[data-color]')){
+      swatch.setAttribute('aria-pressed',String(swatch.dataset.color===item.color?.toLowerCase()));
+    }
+    controls('original').disabled=!item.color;
     flipChaiseButton.hidden = item.kind !== 'sectional';
     widthInput.value = item.width;
     depthInput.value = item.depth;
@@ -702,7 +918,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   }
 
   function select(id) {
-    if (id !== selectedId) showSize(false);
+    if (id !== selectedId) {showSize(false);showColor(false);}
     selectedId = id;
     updateSelection();
     redraw();
@@ -749,6 +965,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     clearPlacement();
     showPalette(false);
     showSize(false);
+    showColor(false);
     editor.hidden = !editing;
     editorButton.setAttribute('aria-expanded', String(editing));
     stage.dataset.editing = String(editing);
@@ -845,12 +1062,19 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     return { x: snap(point.x + active.offsetX), z: snap(point.z + active.offsetZ) };
   }
 
-  for (const [kind, info] of Object.entries(catalog)) {
+  for (const [room,kinds] of Object.entries(rooms)) {
+    const section=document.createElement('section'),title=document.createElement('h3');
+    title.textContent=room;section.className='furniture-room';section.setAttribute('aria-label',room);
+    section.append(title);palette.append(section);
+    for(const kind of kinds)addChoice(kind,section);
+  }
+  function addChoice(kind,section) {
+    const info=catalog[kind];
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.furnitureKind = kind;
     button.textContent = info.label;
-    palette.append(button);
+    section.append(button);
     button.addEventListener('click', event => {
       showPalette(false);
       pendingKind = kind;
@@ -890,12 +1114,13 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     const item = current();
     if (item?.kind === 'sectional') revise(item, { chaise: item.chaise === 'left' ? 'right' : 'left' }, 'Chaise flipped.');
   });
-  resizeButton.addEventListener('click', () => showSize(size.hidden));
+  resizeButton.addEventListener('click', () => {showColor(false);showSize(size.hidden);});
   controls('remove').addEventListener('click', () => {
     const index = items.findIndex(item => item.id === selectedId);
     if (index === -1) return;
     remember();
     const [removed] = items.splice(index, 1);
+    releaseColor(objects.get(removed.id));
     layer.remove(objects.get(removed.id));
     objects.delete(removed.id);
     select(null);
@@ -908,6 +1133,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     cancelGesture();
     clearPlacement();
     showPalette(false);
+    for(const object of objects.values())releaseColor(object);
     layer.clear();
     objects.clear();
     items.splice(0, items.length, ...undoState.items);
@@ -923,7 +1149,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     input.addEventListener('input', () => { input.nextElementSibling.value = input.value + '%'; });
     input.addEventListener('change', () => {
       const item = current();
-      if (item) revise(item, { [dimension]: Number(input.value) }, 'Resized.');
+      if (item) revise(item, lockRatio.checked ? proportionalSize(item,Number(input.value)/item[dimension]) : { [dimension]: Number(input.value) }, 'Resized.');
     });
   }
 
@@ -1032,6 +1258,8 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
       showPalette(false);
       addButton.focus();
       message(instruction);
+    } else if (!colorPanel.hidden) {
+      showColor(false);colorButton.focus();
     } else if (!size.hidden) {
       showSize(false);
       resizeButton.focus();
@@ -1050,7 +1278,11 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   viewer.dataset.furnishings = String(items.length);
   return {
     setLighting,
-    refreshHandles,
+    visitLightFixtures(visit){
+      if(!layer.visible)return;
+      for(const item of items)if(item.kind==='floorLamp' || item.kind==='ledStrip')visit(item.kind,objects.get(item.id));
+    },
+    refreshHandles,cancelGesture,
     handleKey(event) {
       if (editor.hidden) return false;
       if (event.key === 'Escape') {

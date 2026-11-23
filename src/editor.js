@@ -5,11 +5,22 @@ export class T90ConfigEditor extends HTMLElement {
   render() {
     if (!this.h || !this.config) return;
     const keys = Object.keys(this.h.states).filter(key => /^(vacuum|image)\./.test(key)).sort();
-    const signature = JSON.stringify([keys,this.config.entity,this.config.map_entity]);
+    const signature = JSON.stringify([keys,this.config.map_source,this.config.entity,this.config.map_entity]);
     if (signature === this.signature) return;
     this.signature = signature;
     this.shadowRoot.replaceChildren();
-    for (const [field,domain,label] of [['entity','vacuum','Deebot T90'],['map_entity','image','Ecovacs map image']]) {
+    const profile=document.createElement('label'), chooser=document.createElement('select');
+    profile.style.cssText='display:grid;gap:6px;margin:12px 0';
+    chooser.style.cssText='font:inherit;padding:10px;color:inherit;background:var(--card-background-color)';
+    chooser.add(new Option('Ecovacs T90','ecovacs'));
+    chooser.add(new Option('Roborock Qrevo (stock map colors)','roborock_qrevo'));
+    chooser.value=this.config.map_source || 'ecovacs';
+    chooser.onchange=()=>{
+      this.config={...this.config,map_source:chooser.value};
+      this.dispatchEvent(new CustomEvent('config-changed',{detail:{config:this.config},bubbles:true,composed:true}));
+    };
+    profile.append('Map source',chooser);this.shadowRoot.append(profile);
+    for (const [field,domain,label] of [['entity','vacuum','Vacuum'],['map_entity','image','Map image']]) {
       const row = document.createElement('label'), select = document.createElement('select');
       row.style.cssText = 'display:grid;gap:6px;margin:12px 0';
       select.style.cssText = 'font:inherit;padding:10px;color:inherit;background:var(--card-background-color);';

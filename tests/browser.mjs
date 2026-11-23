@@ -107,6 +107,9 @@ try {
   const oldItems = await readFurniture();
   const canvasKeys = scene.locator('canvas');
   for (const [kind,name] of Object.entries({
+    nightstand:'Bedside table',shoeCabinet:'Shoe cabinet',sideTable:'Round side table',diningChair:'Dining chair',range:'Oven and hob',coatRack:'Coat rack',media:'TV and console',
+    armchair:'Armchair',ottoman:'Round ottoman',bookcase:'Bookcase',dresser:'Dresser',
+    console:'Low media console',bench:'Entry bench',compactFridge:'Retro refrigerator',dishwasher:'Dishwasher',
     ledStrip:'LED strip',floorLamp:'Floor lamp',plant:'Potted plant',officeDesk:'Office desk',officeChair:'Office chair'
   })) {
     await scene.getByRole('button',{name:'Add furniture',exact:true}).click();
@@ -114,6 +117,23 @@ try {
     await canvasKeys.press('Enter');
     const placed = (await readFurniture()).at(-1);
     assert.equal(placed.kind,kind);
+    if(kind==='armchair'){
+      await scene.getByRole('button',{name:'Color',exact:true}).click();
+      await scene.getByRole('button',{name:'Navy',exact:true}).click();
+      assert.equal((await readFurniture()).at(-1).color,'#455e77');
+      await scene.getByRole('button',{name:'Add furniture',exact:true}).click();
+      await scene.getByRole('button',{name:'Armchair',exact:true}).click();
+      await canvasKeys.press('Enter');
+      assert.equal((await readFurniture()).at(-1).color,undefined);
+      await scene.getByRole('button',{name:'Color',exact:true}).click();
+      const custom=scene.getByLabel('Custom furniture color');
+      await custom.fill('#a95d45');await custom.dispatchEvent('change');
+      assert.deepEqual((await readFurniture()).slice(-2).map(i=>i.color),['#455e77','#a95d45']);
+      await scene.getByRole('button',{name:'Original color',exact:true}).click();
+      assert.equal((await readFurniture()).at(-1).color,undefined);
+      await scene.locator('[data-furnishing=undo]').click();
+      assert.deepEqual((await readFurniture()).slice(-2).map(i=>i.color),['#455e77','#a95d45']);
+    }
     await canvasKeys.press('ArrowRight');
     await scene.getByRole('button',{name:'Drag to rotate furniture'}).press('Shift+ArrowLeft');
     await scene.getByRole('button',{name:'Resize',exact:true}).click();
@@ -121,7 +141,15 @@ try {
     const edited = (await readFurniture()).at(-1);
     assert.equal(edited.x,placed.x+1.5);
     assert.ok(Math.abs(edited.rotation - 15/90) < 1e-8);
-    assert.equal(edited.width,105);
+    assert.deepEqual([edited.width,edited.depth,edited.height],[105,105,105]);
+    if(kind==='media'){
+      const lock=scene.getByRole('checkbox',{name:'Keep proportions'});
+      await lock.uncheck();
+      await scene.getByRole('slider',{name:'Depth',exact:true}).press('ArrowRight');
+      const custom=(await readFurniture()).at(-1);
+      assert.deepEqual([custom.width,custom.depth,custom.height],[105,110,105]);
+      await lock.check();
+    }
   }
   const editedItems = await readFurniture();
   assert.deepEqual(editedItems.slice(0,oldItems.length),oldItems);
