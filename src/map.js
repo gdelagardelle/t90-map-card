@@ -43,6 +43,10 @@ export function parseT90Map(xml) {
     return xy.every(Number.isFinite) ? xy : null;
   };
   const robot = marker('d'), dock = marker('c');
+  return makeMap(box, floors, edges, robot, dock, route);
+}
+
+export function makeMap(box, floors, edges, robot, dock, route = '') {
   const use = (id,xy) => xy ? '<use href="#'+id+'" x="'+xy[0]+'" y="'+xy[1]+'"/>' : '';
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+box.join(' ')+'"><g>' +
     floors.map((d,i) => '<path fill="'+colors[i % colors.length]+'" d="'+d+'"/>').join('') +
