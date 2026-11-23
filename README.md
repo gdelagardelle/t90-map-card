@@ -1,12 +1,16 @@
 # T90 3D Map Card
 
-Build an editable 3D floor plan from your robot’s map in Home Assistant. Choose rooms, follow the vacuum, and furnish the floor plan in your browser. Stable v0.2.0 supports the Ecovacs Deebot T90. The [v0.3.0-beta.3 preview](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.3) supports Roborock Qrevo maps, taller walls, and a glowing cleaning path. Beta 3 adds six table and closet options and a Free stretch mode for independent width and depth. All screenshots use fictional maps.
+Build an editable 3D floor plan from your robot’s map in Home Assistant. [Beta 6](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.6) includes the Ecovacs T90 and Roborock Qrevo map editors. T90 owners get a compact control panel, a brighter traveling light along the cleaning path, and a model-specific Start fix for the T90 MAX PLUS OMNI. During a selected-room clean, map updates keep the command status steady. All screenshots use fictional maps.
+
+For Dreame, SwitchBot, Roomba, Shark, Xiaomi, Matter and Valetudo, see the [compatibility table and installation guides](https://github.com/gdelagardelle/t90-map-card/blob/v0.3.0-beta.4/README.md#which-download-fits-your-robot). The beta 6 release also includes those four tester modules.
 
 ![Roborock preview with a white Qrevo beside the controls and on a furnished fictional floor](docs/roborock-qrevo.png)
 
-![T90 dashboard showing the robot, a furnished 3D floor plan, and Kitchen and Living room selected](docs/dashboard.png)
+![T90 dashboard showing the robot, a furnished 3D floor plan, and the living room selected](docs/dashboard.png)
 
 ![Night appearance with the robot controls beside the floor plan](docs/dashboard-night.png)
+
+![A traveling light follows the recorded Ecovacs cleaning path](docs/cleaning-path.gif)
 
 ## Before installing
 
@@ -18,14 +22,14 @@ Build an editable 3D floor plan from your robot’s map in Home Assistant. Choos
 ## Install with HACS
 
 1. Open **HACS → ⋮ → Custom repositories**. Paste `https://github.com/gdelagardelle/t90-map-card` and choose **Dashboard** as the type.
-2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For Roborock, open **Need a different version?** and select **v0.3.0-beta.3**. Reload your dashboard after installation.
+2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For the T90 Start and trail fixes or Roborock support, open **Need a different version?** and select **v0.3.0-beta.6**. Reload your dashboard after installation.
 3. Edit your dashboard and select **Add card → T90 3D Map**. Select your map source, vacuum, and its map image.
 
 This repository can be added directly to HACS. [HACS custom repository instructions](https://www.hacs.xyz/docs/faq/custom_repositories/)
 
 ## Manual install
 
-1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.3/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
+1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.6/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
 2. In **Settings → Dashboards → ⋮ → Resources**, add `/local/t90-map-card.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. Reload the page.
 3. Use the visual editor or add a manual card with your own entity IDs.
 
@@ -72,13 +76,15 @@ Map rendering and room selections have been exercised against Qrevo 2 Pro Series
 
 ## Map appearance
 
-Choose **Daylight** or **Night** at the top of the card. Daylight pairs pale marble with warm controls. Night uses cooler shadows and amber lighting. Both appearances show the robot, cleaning target and controls to the right of the map on wide cards. They stack below the map when the card is 760 pixels wide or narrower. The choice is remembered in this browser for the configured vacuum and map. You can switch while editing or tracking a cleaning run.
+Choose **Daylight** or **Night** at the top of the card. Daylight pairs pale marble with warm controls. Night uses cooler shadows and amber lighting. Both appearances show the robot, cleaning target and controls to the right of the map on wide cards. The T90 controls move below the map when the card is under 800 pixels wide. Use the camera selector for overhead, follow and dock views. Open **Layers** to toggle the path, furnishings or original scan. **Replay path** plays one sweep along the recorded trail while the vacuum is idle or docked. It sends no robot command and respects reduced-motion settings. Open **Edit map** to edit furnishings and walls or lock the layout. The choice is remembered in this browser for the configured vacuum and map. You can switch while editing or tracking a cleaning run.
 
 ## Clean rooms with a Deebot T90
 
 Tap a room on the floor. On the first tap, choose its Ecovacs room name and select **Save room**. Repeat for each room you want to target. Once a room is matched, tapping it toggles its highlight. You can also select rooms under **Choose rooms**.
 
-Read the Start button before tapping it. **Start · Kitchen + Living room** sends those two room IDs. **Start · Whole home** starts a whole-home clean. Tapping the map alone never starts the robot. While paused, **Resume** continues the existing job. **Change a map room name** lets you correct an assignment.
+Check **Cleaning target** before pressing **Start**. If the target reads **Kitchen · Living room**, the card sends those two room IDs. **Whole home** starts a whole-home clean. While paused, **Resume** continues the existing job. **Change a map room name** lets you correct an assignment.
+
+On an Ecovacs T90 MAX PLUS OMNI identified by Home Assistant as `b7vftn`, the card uses the newer `clean_V2` command. Whole-home Start was tested on hardware running firmware 1.67.2. The station washed the mop before the vacuum reported cleaning. Room commands for this model have been checked in browser tests. A message under Start shows whether the robot has acknowledged cleaning. If Home Assistant loses the selected floor or room list, the card preserves the target or asks you to choose it again.
 
 The glowing marker follows the latest reported position. The card checks the map while the dashboard is visible. Update speed depends on how often the integration publishes a new image. A new observed cleaning run masks the previous run’s path. Settings, dock actions, and maintenance readings depend on which entities the integration exposes and enables for your device.
 

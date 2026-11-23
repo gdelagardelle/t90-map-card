@@ -1,3 +1,5 @@
+export const ROUTE_SWEEP_MS = 5000;
+
 // One low-frequency render loop per visible, actively cleaning map.
 export function routeLight(viewer, draw) {
   const phase={value:-1};
@@ -6,7 +8,7 @@ export function routeLight(viewer, draw) {
   function refresh() {
     clearTimeout(timer);
     const moving=enabled && inView && !document.hidden && !preference.matches;
-    phase.value=moving ? ((performance.now()-started)%5000)/5000 : -1;
+    phase.value=moving ? ((performance.now()-started)%ROUTE_SWEEP_MS)/ROUTE_SWEEP_MS : -1;
     viewer.dataset.routePulse=moving?'moving':enabled?'still':'off';
     draw();
     if(moving) timer=setTimeout(refresh,50);

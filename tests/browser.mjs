@@ -58,6 +58,11 @@ try {
   const start=card.getByRole('button',{name:'Start · Kitchen + Living room'});
   await start.click();
   assert.deepEqual(await page.evaluate(()=>calls[0]),['vacuum','send_command',{command:'spot_area',params:{rooms:[0,4],cleanings:1}},{entity_id:'vacuum.demo_bot'}]);
+  // Feed an accepted command back as robot telemetry before starting a new job.
+  await page.evaluate(() => {
+    hass.states['vacuum.demo_bot'].state = 'cleaning'; card.hass = hass;
+    hass.states['vacuum.demo_bot'].state = 'docked'; card.hass = hass;
+  });
   await page.evaluate(({rooms})=>{
     card.config.maps={ [card.scope]:{room_bindings:Object.fromEntries(rooms.map(([name,id,d])=>[d,id]))} };
     card.refresh();
@@ -89,9 +94,11 @@ try {
     assert.equal(await card.evaluate(c => c.scrollWidth <= c.clientWidth),true);
   }
   await page.setViewportSize({width:1410,height:935});
+  await scene.getByText('Edit map',{exact:true}).click();
   await scene.getByRole('button',{name:'Lock layout',exact:true}).click();
   assert.equal(await scene.getByRole('button',{name:'Edit walls'}).count(),0);
   await page.evaluate(()=>{card.frame.srcdoc=card.frame.srcdoc;});
+  await scene.getByText('Edit map',{exact:true}).click();
   await scene.getByRole('button',{name:'Unlock layout'}).click();
   await scene.getByRole('button',{name:'Edit walls'}).click();
   await scene.locator('canvas').press('PageDown');
@@ -102,6 +109,7 @@ try {
   if (process.argv.includes('--pictures')) await viewer.screenshot({path:'docs/wall-editor.png'});
   await scene.getByRole('button',{name:'Undo',exact:true}).click();
   await scene.getByRole('button',{name:'Done',exact:true}).click();
+  await scene.getByText('Edit map',{exact:true}).click();
   await scene.getByRole('button',{name:'Edit furnishings'}).click();
   await scene.locator('canvas').press('PageDown');
   await scene.getByRole('button',{name:'Drag to rotate furniture'}).waitFor();
@@ -169,8 +177,9 @@ try {
   assert.deepEqual(await readFurniture(),editedItems);
   assert.equal(await scene.locator('html').getAttribute('data-appearance'),'night');
   const f=page.frames().find(frame=>frame.parentFrame());
-  await f.getByRole('button',{name:'Top view'}).click();await f.waitForFunction(()=>document.querySelector('.viewer').dataset.cameraMotion==='idle');
+  await f.getByRole('combobox',{name:'Camera view',exact:true}).selectOption('top');await f.waitForFunction(()=>document.querySelector('.viewer').dataset.cameraMotion==='idle');
   await page.evaluate(()=>{card.selectedRooms.clear();card.config.maps={};card.refresh();});
+  await scene.getByText('Edit map',{exact:true}).click();
   await scene.getByRole('button',{name:'Lock layout',exact:true}).click();
   const canvas=await scene.locator('canvas').boundingBox();
   const scale=canvas.height/Math.max(146*1.42,194*1.15/(canvas.width/canvas.height));
@@ -178,7 +187,8 @@ try {
   await card.getByLabel('Ecovacs room name').selectOption('0');
   await card.getByRole('button',{name:'Save room',exact:true}).click();
   await card.getByRole('button',{name:'Start · Kitchen',exact:true}).waitFor();
-  assert.equal(await card.locator('[data-action=start]').innerText(),'Start · Kitchen');
+  assert.equal(await card.locator('[data-action=start]').innerText(),'Start');
+  assert.equal(await card.locator('.target').innerText(),'Kitchen');
   await card.getByText('Room layout',{exact:true}).click();
   await card.getByRole('button',{name:'Save this layout to the dashboard'}).click();
   await card.getByRole('status').filter({hasText:'Layout saved'}).waitFor();
@@ -240,8 +250,35 @@ try {
     card.frame.contentWindow.deebotTrackingUpdate(sample);
   });
   await scene.locator('.viewer[data-route-pulse=moving]').waitFor();
+  await scene.getByText('Layers',{exact:true}).click();
   await scene.getByRole('button',{name:'Cleaning path',exact:true}).click();
   assert.equal(await scene.locator('.viewer').getAttribute('data-route-pulse'),'off');
+  // A single move shorter than the robot can hide the whole lit stroke under
+  // its bumper. Verify pixels change, not just the animation's internal flag.
+  await page.evaluate(()=>{
+    const sample={...card.overlay,xy:[86.4,111.8],state:'paused',received:Date.now()+15000,
+      route:'M425 -550L432 -559',mapTime:new Date().toISOString()};
+    card.frame.contentWindow.deebotTrackingUpdate(sample);
+  });
+  const replay=scene.getByRole('button',{name:'Replay path'});
+  assert.equal(await replay.isDisabled(),true);
+  await scene.getByRole('button',{name:'Cleaning path',exact:true}).click();
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await replay.isDisabled(),true);
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  const callsBefore=await page.evaluate(()=>calls.length);
+  const canvasImage = scene.locator('canvas');
+  await replay.click();
+  await scene.locator('[data-route-pulse=moving]').waitFor();
+  const firstFrame = await canvasImage.screenshot();
+  let visibleMotion=false;
+  for(let attempt=0;attempt<6 && !visibleMotion;attempt++){
+    await page.waitForTimeout(160);
+    visibleMotion=!firstFrame.equals(await canvasImage.screenshot());
+  }
+  assert.ok(visibleMotion,'The short cleaning path must have visible motion.');
+  await scene.locator('[data-route-pulse=off]').waitFor({timeout:8000});
+  assert.equal(await page.evaluate(()=>calls.length),callsBefore);
   assert.deepEqual(errors,[]);
   console.log('Passed: dynamic maps, clean initial layout, floor switch, scoped edits, room 0, lock and room taps, wall angle, furniture handles, pause/resume, invalid map.');
 } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }

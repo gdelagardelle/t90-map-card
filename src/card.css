@@ -49,3 +49,70 @@ dialog::backdrop { background:#09090999 } dialog select { display:block; width:1
   .main-actions { grid-column:1/-1 }
   iframe { height:540px }
 }
+
+
+.deebot .appearance {
+  padding:12px clamp(16px,2.5%,30px); gap:12px;
+}
+.deebot .card-heading {font-family:Georgia,serif; font-weight:500; font-size:26px; letter-spacing:-.045em}
+.deebot .picker {padding:2px; border-radius:10px}
+.deebot .picker button {border-radius:7px; min-height:36px; font-size:12px}
+.deebot .map-row {grid-template-columns:minmax(0,1fr) clamp(224px,22%,282px)}
+.deebot iframe {height:clamp(425px,55vh,640px)}
+.deebot .robot-panel {
+  justify-content:center; align-items:stretch; gap:0;
+  padding:22px clamp(16px,2%,28px);
+  background:linear-gradient(165deg,color-mix(in srgb,var(--selected) 34%,var(--paper)),var(--paper) 60%);
+}
+.deebot .robot-panel img {order:1; height:clamp(92px,10vw,135px); margin:8px 0 10px}
+.deebot .identity {order:0}
+.deebot .identity h2 {font-size:clamp(21px,2vw,28px); line-height:1.15; margin-bottom:5px}
+.deebot .vitals {font-size:13px; line-height:1.5}
+.deebot .targetbox {order:2; padding:14px 0 0}
+.deebot .target-label {font-size:12px}
+.deebot .target {margin:3px 0 12px; font-size:16px; line-height:1.35}
+.deebot .main-actions {order:3; display:grid; grid-template-columns:1fr 1fr; gap:7px}
+.deebot .main-actions button {
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  min-height:42px; font-size:13px; line-height:1.25; padding:8px;
+}
+.deebot .main-actions .primary {grid-column:1/-1; min-height:44px; font-weight:650}
+.deebot .main-actions svg {width:15px; height:15px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linejoin:round; stroke-linecap:round}
+.deebot .action-target {display:none}
+.deebot {min-width:0}
+ha-card:has(.deebot) .panel {gap:0; padding:0 clamp(16px,2.5%,30px)}
+ha-card:has(.deebot) .panel details {padding:0}
+ha-card:has(.deebot) .panel summary {padding:14px 2px; font-size:14px}
+ha-card:has(.deebot) .panel .content {margin:0 0 16px}
+ha-card:has(.deebot) .alert,ha-card:has(.deebot) .note:not(:empty) {margin:12px 0}
+@container(max-width:799px) {
+  .deebot .map-row {grid-template-areas:"map" "robot";grid-template-columns:minmax(0,1fr)}
+  .deebot iframe {height:clamp(300px,74cqw,446px)}
+  .deebot .robot-panel {
+    display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center;
+    gap:0 12px; padding:14px 16px; border:0; border-top:1px solid var(--edge);
+  }
+  .deebot .robot-panel img {grid-column:1;grid-row:1; width:66px; height:54px; margin:0}
+  .deebot .identity {grid-column:2; grid-row:1}
+  .deebot .identity h2 {font-size:20px; margin:0}
+  .deebot .targetbox {grid-column:1/-1; display:flex; align-items:baseline; gap:8px; border:0; padding:10px 0}
+  .deebot .target {margin:0; font-size:14px}
+  .deebot .main-actions {grid-column:1/-1;grid-template-columns:1.25fr 1fr 1fr}
+  .deebot .main-actions .primary {grid-column:auto}
+  .deebot .card-heading {font-size:23px}
+}
+.deebot .command-status {order:4;grid-column:1/-1;margin:10px 0 0;font-size:13px;line-height:1.45;color:var(--dim);overflow-wrap:anywhere}
+.deebot .command-status[data-level=error] {border-inline-start:3px solid var(--accent);padding-inline-start:10px;color:var(--ink)}
+ha-card:has(.deebot) .panel summary {
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  list-style:none;min-height:44px;color:var(--ink);
+}
+ha-card:has(.deebot) .panel summary::-webkit-details-marker {display:none}
+ha-card:has(.deebot) .panel summary::after {
+  content:"";width:6px;height:6px;margin-right:4px;border:solid var(--dim);
+  border-width:0 1.5px 1.5px 0;transform:rotate(45deg);flex:none;
+}
+ha-card:has(.deebot) .panel details[open] summary::after {transform:rotate(225deg)}
+@container(max-width:799px) {
+  .deebot .robot-panel:has(img[hidden]) .identity {grid-column:1/-1}
+}

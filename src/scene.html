@@ -337,6 +337,10 @@
     .device { display:block; padding:8px 0; border:0; background:transparent }
     .device>div:not(.tools),footer { display:none }
     .notice { background:var(--paper); color:var(--ink); border-radius:8px; padding:8px }
+    .room-pin { position:absolute;z-index:2;pointer-events:none;transform:translate(-50%,-100%);display:grid;gap:2px;padding:7px 10px;max-width:min(185px,90%);overflow-wrap:anywhere;background:var(--paper);color:var(--ink);border:1px solid var(--accent);border-radius:9px;box-shadow:0 2px 8px #0003;line-height:1.2; }
+    .room-pin strong {font-size:13px;} .room-pin small {font-size:11px;color:var(--dim);}
+    .room-pin[data-current=true] {border-color:var(--ink);}
+    .viewer.show-source .room-pin,.stage[data-editing=true] .room-pin {display:none;}
     .dock-pin { background:var(--paper); color:var(--ink); border-color:var(--accent) }
     .tools { display:flex; gap:8px; flex-wrap:wrap }
     .tools button { display:inline-flex; justify-content:center; min-height:40px; padding:7px 12px; font-size:13px; white-space:nowrap }
@@ -348,6 +352,39 @@
       main { height:calc(100dvh - 24px) }
       header nav { gap:4px }
       header nav button { font-size:13px; padding:5px 8px }
+    }
+    .deebot-scene body {padding:0 16px 12px}
+    .deebot-scene main {height:calc(100dvh - 12px);grid-template-rows:auto minmax(0,1fr)}
+    .deebot-scene header {position:relative;z-index:6;display:flex;align-items:center;justify-content:flex-start;gap:8px; margin:0;padding:9px 0;flex-wrap:wrap}
+    .deebot-scene header h1,.deebot-scene .device {display:none}
+    .deebot-scene header .feed-label {display:flex;align-items:center;gap:7px;color:var(--dim);margin:0 8px 0 0;font-size:12px;font-weight:550}
+    .deebot-scene .feed-label::before {content:"";width:7px;height:7px;flex:none;border-radius:50%;background:currentColor}
+    .deebot-scene:has(.viewer[data-tracking=live]) .feed-label::before {background:#47866b}
+    .deebot-scene[data-appearance=night]:has(.viewer[data-tracking=live]) .feed-label::before {background:#82c7a5}
+    .deebot-scene header nav {margin-left:auto}
+    .deebot-scene header .tools {display:flex;gap:6px;flex:none;padding:0}
+    .deebot-scene .stage,.deebot-scene .stage[data-editing=true] {display:block;min-height:0}
+    .deebot-scene .viewer {border-radius:10px}
+    .deebot-scene .tools details {position:relative}
+    .deebot-scene .tools summary,.deebot-scene .camera-select {
+      display:flex;align-items:center;gap:8px;min-height:40px;padding:7px 10px;box-sizing:border-box;
+      font-family:inherit;font-size:12px;font-weight:600;line-height:1.2;
+      cursor:pointer;border:1px solid var(--edge);border-radius:8px;background:var(--paper);color:var(--ink);
+    }
+    .deebot-scene .camera-select {display:block;max-width:128px}
+    .deebot-scene .tools summary {list-style:none}
+    .deebot-scene .tools summary::-webkit-details-marker {display:none}
+    .deebot-scene .tools summary::after {content:"";border:solid currentColor;border-width:0 1.5px 1.5px 0;padding:2px;transform:translateY(-1px) rotate(45deg)}
+    .deebot-scene .tools details[open] summary {border-color:var(--accent);color:var(--accent)}
+    .deebot-scene summary:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+    .deebot-scene .tool-list {position:absolute;right:0;top:calc(100% + 5px);width:168px;padding:5px;display:grid;gap:2px;border:1px solid var(--edge);border-radius:10px;background:var(--paper);box-shadow:0 6px 18px #0002}
+    .deebot-scene .tool-list button {justify-content:space-between;border-radius:6px;border:0;width:100%;min-height:40px;padding:9px 10px;font-size:13px}
+    .deebot-scene .stage[data-editing=true] .viewer {overflow:auto}
+    @media(max-width:530px) {
+      .deebot-scene body {padding-inline:10px}
+      .deebot-scene header {gap:5px}
+      .deebot-scene header .feed-label {margin-right:0;font-size:11px}
+      .deebot-scene .tools summary,.deebot-scene .camera-select {padding-inline:8px}
     }
   </style></head>
 <body>

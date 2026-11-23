@@ -1,12 +1,12 @@
 {
   "name": "t90-map-card",
-  "version": "0.3.0-beta.3",
+  "version": "0.3.0-beta.6",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node tests/roborock-geometry.mjs && node tests/browser.mjs && node tests/roborock.mjs"
+    "test": "node tests/roborock-geometry.mjs && node tests/browser.mjs && node tests/ecovacs-start.mjs && node tests/roborock.mjs"
   },
   "dependencies": {
     "three": "0.186.0"
