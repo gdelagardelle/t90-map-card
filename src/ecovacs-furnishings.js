@@ -1,4 +1,6 @@
 import { proportionalSize,sizeEquipment } from './furniture-scale.js';
+import { validLightId } from './fixture-lights.js';
+import { fixtureLightMaterials } from './fixture-light-materials.js';
 import { scope } from './scene-context.js';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -350,10 +352,14 @@ function buildPrototypes(addMesh, makeMaterial, marbleMap) {
   addMesh(lamp, new THREE.CylinderGeometry(2.8, 4, 5.6, 36, 1, true), shade, 0, 15.6, 0);
   addMesh(lamp, new THREE.SphereGeometry(1.1, 16, 12), shade, 0, 15, 0);
 
+  lamp.traverse(mesh=>{if(mesh.material===shade)mesh.userData.fixtureEmitter=true;});
+
   const strip = groups.ledStrip;
   const diffuser = makeMaterial(0xfff0cd, { emissive: 0xffc587 });
   block(strip, steel, 24, 0.56, 1.6, 0, 0.3, 0);
   block(strip, diffuser, 23.7, 0.32, 1.28, 0, 0.68, 0);
+
+  strip.traverse(mesh=>{if(mesh.material===diffuser)mesh.userData.fixtureEmitter=true;});
 
   // Distance to a line segment gives the strip even spill with rounded ends.
   // A zero-length segment gives the lamp a circular pool. Clones share both textures.
@@ -638,7 +644,9 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   const layer = new THREE.Group();
   model.add(layer);
   const objects = new Map();
-  const { groups: prototypes, setLighting } = buildPrototypes(addMesh, makeMaterial, marbleMap);
+  const lightSource = window.frameElement?.t90Map?.lights;
+  const lights = fixtureLightMaterials();
+  const { groups: prototypes, setLighting: setDefaultLighting } = buildPrototypes(addMesh, makeMaterial, marbleMap);
   const boundary = floors.flatMap(path => path.toShapes().map(shape => shape.extractPoints(1)));
   const ray = new THREE.Raycaster();
   const cursor = new THREE.Vector2();
@@ -683,6 +691,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
             !Number.isFinite(item.rotation) || item.rotation < 0 || item.rotation >= 4 ||
             !isDimension(item.width, widthInput) || !isDimension(item.depth, depthInput) || (!fits(item) && item.kind !== 'coffee')) return false;
           if(typeof item.color!=='string' || !/^#[0-9a-f]{6}$/i.test(item.color))delete item.color;
+          if(!['floorLamp','ledStrip'].includes(item.kind) || !validLightId(item.lightEntity))delete item.lightEntity;
           if(!isDimension(item.height,widthInput))delete item.height;
           ids.add(item.id);
           return true;
@@ -715,6 +724,79 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
       updateShadows = false;
       render(dirty);
     });
+  }
+
+  const linkLabel=selection.querySelector('.fixture-link');
+  const lightSelect=linkLabel.querySelector('select');
+  const lightSearch=linkLabel.querySelector('input');
+  const linkButton=controls('link');
+  const lightStatus=linkLabel.querySelector('.fixture-state');
+  function currentLight(item){
+    return item.lightEntity && lightSource ? lightSource.read(item.lightEntity) : null;
+  }
+  function showLightState(item){
+    const value=currentLight(item);
+    lightStatus.textContent=!value?'':value.state==='off'?'Off':
+      value.state==='on'?'On · '+Math.round(value.level*100)+'%':'Unavailable';
+  }
+  function fillLightPicker(){
+    const item=current();
+    if(!item || !lightSource || linkLabel.hidden)return;
+    const options=[new Option('Unlinked', '')];
+    const choices=lightSource.choices(),query=lightSearch.value.trim().toLowerCase();
+    lightSearch.hidden=choices.length<=8 && !query;
+    let found=false, matches=0;
+    for(const {id,name} of choices){
+      const match=!query || (name+' '+id).toLowerCase().includes(query);
+      if(match)matches++;
+      if(match || id===item.lightEntity)options.push(new Option(name===id?id:name+' · '+id,id));
+      if(id===item.lightEntity)found=true;
+    }
+    if(item.lightEntity && !found)options.push(new Option('Unavailable · '+item.lightEntity,item.lightEntity));
+    if(query && !matches){const empty=new Option('No matching lights','');empty.disabled=true;options.push(empty);}
+    lightSelect.replaceChildren(...options);
+    lightSelect.value=item.lightEntity || '';
+    showLightState(item);
+  }
+  function showLink(open){
+    lightSearch.value='';linkLabel.hidden=!open;linkButton.setAttribute('aria-expanded',String(open));
+    window.frameElement?.classList.toggle('fixture-link-open',open);
+    if(open){
+      showColor(false);showSize(false);fillLightPicker();
+      (lightSearch.hidden?lightSelect:lightSearch).focus();
+    }
+  }
+  linkButton.onclick=()=>showLink(linkLabel.hidden);
+  lightSearch.addEventListener('input',fillLightPicker);
+  lightSearch.addEventListener('keydown',event=>{
+    if(event.key==='Escape' && lightSearch.value){
+      event.preventDefault();event.stopPropagation();lightSearch.value='';fillLightPicker();
+    }
+  });
+  lightSelect.addEventListener('focus',fillLightPicker);
+  lightSelect.addEventListener('pointerdown',fillLightPicker);
+  lightSelect.addEventListener('change',()=>{
+    const item=current(), id=lightSelect.value;
+    if(!item || !['floorLamp','ledStrip'].includes(item.kind) || (id && !validLightId(id)))return;
+    remember();
+    linkButton.textContent=id?'Linked light':'Link light';
+    if(id)item.lightEntity=id;else delete item.lightEntity;
+    applyItem(item);save(id?'Light linked.':'Light unlinked.');showLightState(item);redraw();
+  });
+  function updateLights(changed){
+    for(const item of items){
+      if(!changed.has(item.lightEntity))continue;
+      lights.apply(objects.get(item.id),currentLight(item));
+      if(item===current() && !selection.hidden)showLightState(item);
+    }
+    redraw();
+  }
+  function watchLights(){
+    lightSource?.watch(items.map(item=>item.lightEntity).filter(Boolean),updateLights);
+  }
+  function setLighting(night){
+    setDefaultLighting(night);
+    for(const item of items)if(item.lightEntity)lights.apply(objects.get(item.id),currentLight(item));
   }
 
   // Three.js clones share their prototype materials. Clone only the finish
@@ -761,6 +843,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
       layer.add(object);
     }
     applyColor(object,item.color);
+    if(item.kind==='floorLamp' || item.kind==='ledStrip')lights.apply(object,currentLight(item));
     object.position.set(item.x, 0, item.z);
     object.rotation.y = item.rotation * Math.PI / 2;
     const mirrored = item.kind === 'sectional' && item.chaise !== 'left';
@@ -775,6 +858,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   }
 
   function save(text) {
+    watchLights();
     try {
       storage.setItem(storageKey, JSON.stringify({ version: 1, items }));
       message(text);
@@ -939,8 +1023,17 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     const item = current();
     selection.hidden = !item || editor.hidden || Boolean(pendingKind);
     showGuide(selection.hidden ? null : item);
-    if (selection.hidden) return;
+    if (selection.hidden) {
+      if(!linkLabel.hidden)showLink(false);
+      return;
+    }
     selectionName.textContent = catalog[item.kind].label;
+    linkButton.hidden = !lightSource || !['floorLamp','ledStrip'].includes(item.kind);
+    linkButton.textContent=item.lightEntity?'Linked light':'Link light';
+    if(linkButton.hidden || linkButton.dataset.item!==String(item.id)){
+      linkButton.dataset.item=String(item.id);showLink(false);
+    }
+    if(!linkLabel.hidden)showLightState(item);
     const original=prototypes[item.kind].children.find(mesh=>mesh.userData.tintable).material.color;
     customColor.value=item.color || '#'+original.getHexString();
     colorButton.style.setProperty('--finish',customColor.value);
@@ -1003,6 +1096,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     showPalette(false);
     showSize(false);
     showColor(false);
+    showLink(false);
     editor.hidden = !editing;
     editorButton.setAttribute('aria-expanded', String(editing));
     stage.dataset.editing = String(editing);
@@ -1157,6 +1251,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     if (index === -1) return;
     remember();
     const [removed] = items.splice(index, 1);
+    lights.release(objects.get(removed.id));
     releaseColor(objects.get(removed.id));
     layer.remove(objects.get(removed.id));
     objects.delete(removed.id);
@@ -1170,7 +1265,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     cancelGesture();
     clearPlacement();
     showPalette(false);
-    for(const object of objects.values())releaseColor(object);
+    for(const object of objects.values()){releaseColor(object);lights.release(object);}
     layer.clear();
     objects.clear();
     items.splice(0, items.length, ...undoState.items);
@@ -1295,6 +1390,8 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
       showPalette(false);
       addButton.focus();
       message(instruction);
+    } else if (!linkLabel.hidden) {
+      showLink(false);linkButton.focus();
     } else if (!colorPanel.hidden) {
       showColor(false);colorButton.focus();
     } else if (!size.hidden) {
@@ -1312,12 +1409,13 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   });
 
   for (const item of items) applyItem(item);
+  watchLights();
   viewer.dataset.furnishings = String(items.length);
   return {
     setLighting,
     visitLightFixtures(visit){
       if(!layer.visible)return;
-      for(const item of items)if(item.kind==='floorLamp' || item.kind==='ledStrip')visit(item.kind,objects.get(item.id));
+      for(const item of items)if(item.kind==='floorLamp' || item.kind==='ledStrip')visit(item.kind,objects.get(item.id),currentLight(item));
     },
     refreshHandles,cancelGesture,
     handleKey(event) {

@@ -76,6 +76,8 @@
       border-radius: 16px;
       background: radial-gradient(ellipse at 42% 36%, #37302a 0%, #272523 48%, #171819 100%);
     }
+    .map-age-pin {position:absolute;z-index:4;pointer-events:none;font:550 11px/1.3 system-ui;color:var(--ink);background:var(--paper);border:1px solid var(--edge);border-radius:6px;padding:5px 8px;white-space:nowrap}
+    .stage[data-editing=true] .map-age-pin {display:none}
     .viewer canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
     .viewer[data-placing="true"] canvas { cursor: crosshair; }
     .viewer[data-dragging="true"] canvas { cursor: grabbing; }
@@ -207,6 +209,21 @@
     .furniture-colors input { width:34px; height:31px; padding:2px; cursor:pointer; }
     .furnishing-palette button { padding-inline: 9px; text-align: left; }
     .editor-bottom { bottom: 14px; display: grid; justify-items: center; gap: 7px; }
+    .fixture-link {display:grid;gap:4px;font-size:12px;margin:6px 0;color:var(--ink)}
+    .fixture-link label {display:grid;gap:4px}
+    .fixture-link :is(input,select) {box-sizing:border-box;min-width:0;width:100%;max-width:100%;min-height:36px}
+    .fixture-link input {border:1px solid var(--edge);border-radius:7px;padding:7px 9px;background:var(--paper);color:var(--ink);font:inherit}
+    #furnishing-editor .editor-bottom {grid-template-columns:minmax(0,1fr)}
+    #furnishing-editor .edit-selection {min-width:0;box-sizing:border-box}
+    #furnishing-editor .edit-selection:has(.fixture-link:not([hidden])) {width:min(100%,520px);grid-template-columns:minmax(0,1fr)}
+    @media(max-width:600px) {
+      #furnishing-editor .editor-top {z-index:3}
+      #furnishing-editor .editor-bottom:has(.fixture-link:not([hidden])) {top:64px;bottom:8px;grid-template-rows:minmax(0,1fr);align-items:end}
+      #furnishing-editor .editor-bottom:has(.fixture-link:not([hidden])) .edit-status {display:none}
+      #furnishing-editor .edit-selection:has(.fixture-link:not([hidden])) {max-height:100%;overflow:auto;overscroll-behavior:contain}
+      #furnishing-editor .edit-selection:has(.fixture-link:not([hidden])) .furnishing-actions > :not(strong,[data-furnishing=link]) {display:none}
+    }
+    .fixture-state {font-size:12px;color:var(--dim)}
     .edit-selection {
       display: grid;
       width: max-content;
@@ -359,8 +376,8 @@
     .deebot-scene header h1,.deebot-scene .device {display:none}
     .deebot-scene header .feed-label {display:flex;align-items:center;gap:7px;color:var(--dim);margin:0 8px 0 0;font-size:12px;font-weight:550}
     .deebot-scene .feed-label::before {content:"";width:7px;height:7px;flex:none;border-radius:50%;background:currentColor}
-    .deebot-scene:has(.viewer[data-tracking=live]) .feed-label::before {background:#47866b}
-    .deebot-scene[data-appearance=night]:has(.viewer[data-tracking=live]) .feed-label::before {background:#82c7a5}
+    .deebot-scene:has(.viewer[data-tracking=live]:not([data-map-delayed])) .feed-label::before {background:#47866b}
+    .deebot-scene[data-appearance=night]:has(.viewer[data-tracking=live]:not([data-map-delayed])) .feed-label::before {background:#82c7a5}
     .deebot-scene header nav {margin-left:auto}
     .deebot-scene header .tools {display:flex;gap:6px;flex:none;padding:0}
     .deebot-scene .stage,.deebot-scene .stage[data-editing=true] {display:block;min-height:0}
@@ -427,7 +444,15 @@
                   <option value="free">Free stretch</option>
                 </select>
                 <button type="button" data-furnishing="color" aria-expanded="false" aria-controls="furniture-colors"><span class="finish-chip" aria-hidden="true"></span>Color</button>
+                <button type="button" data-furnishing="link" aria-expanded="false" aria-controls="fixture-link" hidden>Link light</button>
                 <button type="button" data-furnishing="remove">Remove</button>
+              </div>
+              <div class="fixture-link" id="fixture-link" hidden>
+                <label>Home Assistant light
+                  <input type="search" aria-label="Find a light" placeholder="Find by name or entity ID" autocomplete="off" hidden>
+                </label>
+                <select aria-label="Home Assistant light"></select>
+                <span class="fixture-state" aria-live="polite"></span>
               </div>
               <div class="furniture-colors" id="furniture-colors" role="group" aria-label="Furniture color" hidden>
                 <label>Custom <input type="color" aria-label="Custom furniture color"></label>

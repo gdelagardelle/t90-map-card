@@ -86,9 +86,9 @@ try {
         return softenedTeal;
       },{a:before.toString('base64'),b:after.toString('base64')});
       assert.ok(count>600,'Selected room should have visible, restrained teal floor pixels. Got '+count);
-      assert.deepEqual(await canvas.screenshot(),after,'Selection tint should stay still');
+      assert.ok((await canvas.screenshot()).equals(after),'Selection tint should stay still');
       await selectRoom();
-      assert.deepEqual(await canvas.screenshot(),before,'Deselecting should restore the original room');
+      assert.ok((await canvas.screenshot()).equals(before),'Deselecting should restore the original room');
     }
     await selectRoom();
     for(const width of [390,320]) {

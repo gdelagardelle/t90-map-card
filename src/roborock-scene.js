@@ -1,3 +1,4 @@
+import { mapAgePin } from './map-age-pin.js';
 import { routeLight,lightWave } from './route-light.js';
 import { RasterRoute } from './roborock-route-order.js';
 import { locateRobot } from './roborock-marker.js';
@@ -127,7 +128,9 @@ for(let i=0;i<wallShape.attributes.normal.count;i++){
 wallShape.setAttribute('color',new THREE.Float32BufferAttribute(wallTints,3));
 const transform = new THREE.Object3D();
 const ray = new THREE.Raycaster();
-const draw = () => { if (renderer && surface) renderer.render(scene,camera); };
+const pinPoint=new THREE.Vector3();
+const projectAge=mapAgePin(viewer,()=>robot?.visible && native.hidden && camera ? robot.getWorldPosition(pinPoint).project(camera) : null);
+const draw = () => { if (renderer && surface) {renderer.render(scene,camera); projectAge();} };
 const pulse=routeLight(viewer,draw);
 function syncPulse(){
   const on=runOpen && showTrail() && !!order?.count;
@@ -450,7 +453,7 @@ async function present(blob) {
     currentBlob=blob;
     host.onDisplay(blob,true);
     viewer.dataset.rendered='true';
-    status.textContent=renderer ? 'Roborock · Live map' : 'Roborock · Original map';
+    status.textContent=renderer ? 'Roborock · 3D map' : 'Roborock · Original map';
   } catch {
     if(epoch===generation) {
       host.onDisplay(blob,false);
@@ -464,13 +467,13 @@ function placeLights(){
   for(const source of practicals)source.visible=false;
   if(!furniture || !model?.visible || topView || host.appearance!=='night')return;
   let index=0;
-  furniture.visitLightFixtures((kind,object)=>{
-    if(index>=practicals.length)return;
+  furniture.visitLightFixtures((kind,object,state)=>{
+    if(index>=practicals.length || state?.level===0)return;
     const source=practicals[index++],lamp=kind==='floorLamp';
     source.visible=true;source.position.set(0,lamp?14:2.6,0);
     object.localToWorld(source.position);
-    source.color.setHex(lamp?0xffbc80:0xffa958);
-    source.distance=lamp?235:155;source.intensity=lamp?12500:4200;
+    if(state)source.color.set(state.color);else source.color.setHex(lamp?0xffbc80:0xffa958);
+    source.distance=lamp?235:155;source.intensity=(lamp?12500:4200)*(state?.level ?? 1);
   });
 }
 function setSceneLight(){
