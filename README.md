@@ -1,6 +1,6 @@
 # T90 3D Map Card
 
-Build an editable 3D floor plan from your robot’s map in Home Assistant. Choose rooms, follow the vacuum, and furnish the floor plan in your browser. Stable v0.2.0 supports the Ecovacs Deebot T90. The [v0.3.0-beta.2 preview](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.2) supports Roborock Qrevo maps and adds taller walls and a glowing cleaning path. All screenshots use fictional maps.
+Build an editable 3D floor plan from your robot’s map in Home Assistant. Choose rooms, follow the vacuum, and furnish the floor plan in your browser. Stable v0.2.0 supports the Ecovacs Deebot T90. The [v0.3.0-beta.3 preview](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.3) supports Roborock Qrevo maps, taller walls, and a glowing cleaning path. Beta 3 adds six table and closet options and a Free stretch mode for independent width and depth. All screenshots use fictional maps.
 
 ![Roborock preview with a white Qrevo beside the controls and on a furnished fictional floor](docs/roborock-qrevo.png)
 
@@ -18,14 +18,14 @@ Build an editable 3D floor plan from your robot’s map in Home Assistant. Choos
 ## Install with HACS
 
 1. Open **HACS → ⋮ → Custom repositories**. Paste `https://github.com/gdelagardelle/t90-map-card` and choose **Dashboard** as the type.
-2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For Roborock, open **Need a different version?** and select **v0.3.0-beta.2**. Reload your dashboard after installation.
+2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For Roborock, open **Need a different version?** and select **v0.3.0-beta.3**. Reload your dashboard after installation.
 3. Edit your dashboard and select **Add card → T90 3D Map**. Select your map source, vacuum, and its map image.
 
 This repository can be added directly to HACS. [HACS custom repository instructions](https://www.hacs.xyz/docs/faq/custom_repositories/)
 
 ## Manual install
 
-1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.2/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
+1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.3/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
 2. In **Settings → Dashboards → ⋮ → Resources**, add `/local/t90-map-card.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. Reload the page.
 3. Use the visual editor or add a manual card with your own entity IDs.
 
@@ -97,9 +97,9 @@ The glowing marker follows the latest reported position. The card checks the map
 | Drag a piece, its corner, or its ↻ handle | Moves, resizes, or rotates the furnishing |
 | **Done → Lock layout** | Hides geometry editing on this browser and leaves room selection available |
 
-Both map sources share the furniture palette. Under **Resize**, **Keep proportions** starts on. Drag a corner or adjust either slider to scale a piece uniformly. Turn it off to change width and depth separately. Widening a TV board or desk keeps its screen at its original size. Narrowing the base sufficiently also reduces the screen, keeping its aspect ratio.
+Both map sources share the furniture palette. Select a piece and choose **Keep proportions** to resize uniformly, or **Free stretch** to change width and depth independently. Drag a corner on the map or open **Resize** for separate sliders. Widening a TV board or desk keeps its screen at its original size. Narrowing the base sufficiently also reduces the screen, keeping its aspect ratio.
 
-Browse by room for a bedside table, shoe cabinet, round side table, dining chair, oven and hob, and coat rack. It includes an armchair, ottoman, bookcase, dresser, media console, entry bench, retro refrigerator and dishwasher. A finish applies to the selected piece and is saved with its layout. The palette also includes an **office desk** with a monitor, a separate **office chair**, a **potted plant**, a **floor lamp**, and an **LED strip**. Turn off **Keep proportions** to stretch the strip lengthwise. The strip glows along its full length, including the ends. The floor lamp casts a softer circular pool. Both effects are stronger in Night. They are visual furnishings and do not send commands to a physical light.
+Kitchen & dining includes square and rectangular dining tables and a long trestle table. Bedroom includes single-door, double-door and wide sliding closets. Browse by room for a bedside table, shoe cabinet, round side table, dining chair, oven and hob, and coat rack. It includes an armchair, ottoman, bookcase, dresser, media console, entry bench, retro refrigerator and dishwasher. A finish applies to the selected piece and is saved with its layout. The palette also includes an **office desk** with a monitor, a separate **office chair**, a **potted plant**, a **floor lamp**, and an **LED strip**. Choose **Free stretch** to stretch the strip lengthwise. The strip glows along its full length, including the ends. The floor lamp casts a softer circular pool. Both effects are stronger in Night. They are visual furnishings and do not send commands to a physical light.
 
 Lengths use the map’s coordinate system. Physical calibration is deferred. Edits customize the dashboard drawing. The robot continues to navigate with its Ecovacs map. New installations start with an unfurnished floor.
 

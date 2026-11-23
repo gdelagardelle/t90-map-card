@@ -193,7 +193,8 @@ ${cardStyles}</style>
     this.selectedRooms.clear();
     this.pendingRegion = null;
     this.q('dialog').close();
-    this.frame.t90Map = { scan: map.svg, scope, appearance: this.dataset.appearance };
+    this.frame.t90Map = { scan: map.svg, scope, appearance: this.dataset.appearance,
+      placementBounds: this.config.maps?.[scope]?.placement_bounds };
     this.installSavedLayout();
     this.frame.srcdoc = sceneDocument;
     this.note('');

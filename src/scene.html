@@ -319,7 +319,8 @@
       .furnishing-actions strong { width: 100%; }
       .tools button { font-size: 14px; padding-inline: 10px; }
     }
-  </style>
+      [data-resize-mode] { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--edge); border-radius: 8px; padding: 9px 12px; min-height: 40px; }
+</style>
 <style>
     /* APPEARANCE */
     :root { --quiet:var(--dim); --line:var(--edge); --amber:var(--accent); color:var(--ink); background:var(--paper) }
@@ -384,6 +385,10 @@
                 <button type="button" data-furnishing="rotate">Rotate</button>
                 <button type="button" data-furnishing="flip-chaise" hidden>Flip chaise</button>
                 <button type="button" data-furnishing="resize" aria-expanded="false" aria-controls="furnishing-size">Resize</button>
+                <select data-resize-mode aria-label="Resize mode" title="Free stretch lets you change width and depth independently">
+                  <option value="proportional">Keep proportions</option>
+                  <option value="free">Free stretch</option>
+                </select>
                 <button type="button" data-furnishing="color" aria-expanded="false" aria-controls="furniture-colors"><span class="finish-chip" aria-hidden="true"></span>Color</button>
                 <button type="button" data-furnishing="remove">Remove</button>
               </div>
@@ -392,7 +397,6 @@
                 <button type="button" data-furnishing="original">Original color</button>
               </div>
               <div class="furnishing-size" id="furnishing-size" hidden>
-                <label><input type="checkbox" data-lock-ratio checked> Keep proportions</label>
                 <label class="size">
                   Width<input type="range" min="50" max="400" step="5" value="100" aria-label="Width">
                   <output>100%</output>

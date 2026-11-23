@@ -110,6 +110,8 @@ try {
   const oldItems = await readFurniture();
   const canvasKeys = scene.locator('canvas');
   for (const [kind,name] of Object.entries({
+    squareTable:'Square dining table',rectangularTable:'Rectangular dining table',longTable:'Long trestle table',
+    singleCloset:'Single-door closet',doubleCloset:'Double-door closet',slidingCloset:'Wide sliding closet',
     nightstand:'Bedside table',shoeCabinet:'Shoe cabinet',sideTable:'Round side table',diningChair:'Dining chair',range:'Oven and hob',coatRack:'Coat rack',media:'TV and console',
     armchair:'Armchair',ottoman:'Round ottoman',bookcase:'Bookcase',dresser:'Dresser',
     console:'Low media console',bench:'Entry bench',compactFridge:'Retro refrigerator',dishwasher:'Dishwasher',
@@ -145,13 +147,13 @@ try {
     assert.equal(edited.x,placed.x+1.5);
     assert.ok(Math.abs(edited.rotation - 15/90) < 1e-8);
     assert.deepEqual([edited.width,edited.depth,edited.height],[105,105,105]);
-    if(kind==='media'){
-      const lock=scene.getByRole('checkbox',{name:'Keep proportions'});
-      await lock.uncheck();
+    if(['media','longTable','slidingCloset'].includes(kind)){
+      const mode=scene.getByRole('combobox',{name:'Resize mode'});
+      await mode.selectOption('free');
       await scene.getByRole('slider',{name:'Depth',exact:true}).press('ArrowRight');
       const custom=(await readFurniture()).at(-1);
       assert.deepEqual([custom.width,custom.depth,custom.height],[105,110,105]);
-      await lock.check();
+      await mode.selectOption('proportional');
     }
   }
   const editedItems = await readFurniture();

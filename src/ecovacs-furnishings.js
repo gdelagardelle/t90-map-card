@@ -4,6 +4,12 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 const catalog = {
+  squareTable: { label: 'Square dining table', width: 16, depth: 16 },
+  rectangularTable: { label: 'Rectangular dining table', width: 25, depth: 14 },
+  longTable: { label: 'Long trestle table', width: 38, depth: 13 },
+  singleCloset: { label: 'Single-door closet', width: 11, depth: 9 },
+  doubleCloset: { label: 'Double-door closet', width: 21, depth: 10 },
+  slidingCloset: { label: 'Wide sliding closet', width: 34, depth: 11 },
   nightstand:{label:'Bedside table',width:11,depth:9},
   shoeCabinet:{label:'Shoe cabinet',width:20,depth:7},
   sideTable:{label:'Round side table',width:11,depth:11},
@@ -46,8 +52,8 @@ const catalog = {
 
 const rooms = {
   'Living room': ['sofa','sectional','armchair','ottoman','sideTable','coffee','media','console','bookcase','rug'],
-  'Kitchen & dining': ['cabinets','island','stool','dining','diningChair','range','fridge','compactFridge','dishwasher'],
-  Bedroom: ['queen','single','nightstand','dresser'],
+  'Kitchen & dining': ['cabinets','island','stool','dining','squareTable','rectangularTable','longTable','diningChair','range','fridge','compactFridge','dishwasher'],
+  Bedroom: ['queen','single','nightstand','dresser','singleCloset','doubleCloset','slidingCloset'],
   'Entry & storage': ['bench','shoeCabinet','coatRack','smallCabinet','tallCabinet'],
   Office: ['officeDesk','officeChair'],
   'Bath & laundry': ['toilet','bathSink','bathtub','washer','dryer'],
@@ -447,6 +453,35 @@ function buildPrototypes(addMesh, makeMaterial, marbleMap) {
   block(dishwasher,steel,8,.39,.58,0,10.3,5.68,.12);
   block(dishwasher,slate,2.1,.42,.12,3.4,11.66,5.86,.04);
 
+  for (const kind of ['squareTable','rectangularTable','longTable']) {
+    const table=groups[kind], {width,depth}=catalog[kind];
+    block(table,oak,width,1.1,depth,0,9,0,.32);
+    if(kind==='longTable'){
+      for(const x of [-width*.31,width*.31]){
+        block(table,walnut,1.8,7.8,depth*.57,x,4.6,0);
+        block(table,walnut,3,.8,depth*.83,x,.45,0);
+      }
+      block(table,walnut,width*.67,1.1,1.1,0,3.2,0);
+    }else{
+      for(const x of [-1,1])for(const z of [-1,1])
+        block(table,walnut,1.1,8.5,1.1,x*(width/2-1.7),4.25,z*(depth/2-1.7));
+      block(table,oak,width-3,1.1,depth-3,0,8,0);
+    }
+  }
+  for(const [kind,doors] of [['singleCloset',1],['doubleCloset',2],['slidingCloset',3]]){
+    const closet=groups[kind], {width,depth}=catalog[kind],height=25;
+    const face=width/doors,sliding=kind==='slidingCloset';
+    block(closet,walnut,width-.7,1.1,depth-.7,0,.55,0);
+    block(closet,whiteSide,width,height-1.1,depth-.8,0,(height+1.1)/2,-.4);
+    for(let i=0;i<doors;i++){
+      const x=-width/2+(i+.5)*face,z=depth/2-.45-(sliding && i%2?.28:0);
+      block(closet,whiteCabinet,face-.23,height-2,.6,x,height/2+.45,z);
+      const handleX=x+(i%2?-1:1)*(face/2-1.2);
+      block(closet,steel,.32,sliding?4:2.9,.34,handleX,12,z+.36,.1);
+    }
+    if(sliding)block(closet,steel,width,.34,.8,0,height-.26,depth/2-.4);
+  }
+
   const bedside=groups.nightstand;
   block(bedside,walnut,9.7,1.1,7.8,0,.55,0);
   block(bedside,oak,10.8,6.7,8.4,0,4.45,-.12);
@@ -491,6 +526,8 @@ function buildPrototypes(addMesh, makeMaterial, marbleMap) {
   // Only the named finish is editable. Hardware, upholstery textures,
   // light emitters and details continue to use their original materials.
   const editable={
+    squareTable:[oak],rectangularTable:[oak],longTable:[oak],
+    singleCloset:[whiteCabinet,whiteSide],doubleCloset:[whiteCabinet,whiteSide],slidingCloset:[whiteCabinet,whiteSide],
     nightstand:[oak],shoeCabinet:[whiteCabinet,whiteSide],sideTable:[tableMarble],diningChair:[linen],range:[steel],coatRack:[oak],
     armchair:[linen],ottoman:[sage],bookcase:[oak,walnut],dresser:[oak],console:[oak],
     bench:[linen],compactFridge:[enamel],dishwasher:[whiteCabinet,whiteSide],
@@ -592,7 +629,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
   const selectionName = editor.querySelector('.selected-name');
   const size = editor.querySelector('#furnishing-size');
   const [widthInput, depthInput] = [...size.querySelectorAll('input[type=range]')];
-  const lockRatio=size.querySelector('[data-lock-ratio]');
+  const resizeMode=selection.querySelector('[data-resize-mode]');
   function isDimension(value, input) {
     return Number.isInteger(value) && value >= Number(input.min) && value <= Number(input.max);
   }
@@ -873,7 +910,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
         .addScaledVector(axes.depth,sz*spec.depth*d/200);
       return {...item,width:w,depth:d,x:center.x,z:center.y};
     }
-    if(lockRatio.checked){
+    if(resizeMode.value==='proportional'){
       const w0=spec.width*item.width/100,d0=spec.depth*item.depth/100;
       const scale=(sx*diagonal.dot(axes.width)*w0+sz*diagonal.dot(axes.depth)*d0)/(w0*w0+d0*d0);
       const size=proportionalSize(item,Math.round(scale*100)/100);
@@ -1149,7 +1186,7 @@ export function setupFurnishings({ model, camera, canvas, floors, additionalFloo
     input.addEventListener('input', () => { input.nextElementSibling.value = input.value + '%'; });
     input.addEventListener('change', () => {
       const item = current();
-      if (item) revise(item, lockRatio.checked ? proportionalSize(item,Number(input.value)/item[dimension]) : { [dimension]: Number(input.value) }, 'Resized.');
+      if (item) revise(item, resizeMode.value==='proportional' ? proportionalSize(item,Number(input.value)/item[dimension]) : { [dimension]: Number(input.value) }, 'Resized.');
     });
   }
 

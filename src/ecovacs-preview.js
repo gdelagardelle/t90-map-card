@@ -716,12 +716,22 @@ function renderPreview() {
     },
   });
   refreshWallHandles = wallEditor.refreshHandles;
+  // An imported layout can permit furniture on a part of a room the vacuum
+  // could not scan. It affects placement only, not the floor mesh or navigation.
+  const placementZones = [];
+  const bounds = window.frameElement.t90Map.placementBounds;
+  if (Array.isArray(bounds)) for (const rect of bounds) {
+    if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite)) continue;
+    const [x0,z0,x1,z1] = rect;
+    if (x0 >= x1 || z0 >= z1) continue;
+    placementZones.push({shape:[[x0,z0],[x1,z0],[x1,z1],[x0,z1]].map(([x,z])=>new THREE.Vector2(x,z)),holes:[]});
+  }
   const furnishings = setupFurnishings({
     model,
     camera,
     canvas: renderer.domElement,
     floors,
-    additionalFloors: wallEditor.floorRegions,
+    additionalFloors: () => [...wallEditor.floorRegions(), ...placementZones],
     addMesh,
     makeMaterial,
     marbleMap: marble.map,
