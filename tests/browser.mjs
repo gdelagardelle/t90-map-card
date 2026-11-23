@@ -16,6 +16,14 @@ try {
   const page=await browser.newPage({viewport:{width:1410,height:935},deviceScaleFactor:1});
   const errors=[]; page.on('pageerror', e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+server.address().port+'/demo/robot');
+  const mapDomain = await page.evaluate(async () => {
+    await customElements.whenDefined('t90-map-card');
+    const el = document.createElement('t90-map-card');
+    try { el.setConfig({entity:'vacuum.demo',map_entity:'camera.demo_map'}); }
+    catch { return 'rejected'; }
+    return 'accepted';
+  });
+  assert.equal(mapDomain,'rejected','The stable Ecovacs card must require an image entity');
   await page.evaluate(async ({rooms,svg}) => {
     await customElements.whenDefined('t90-map-card');
     window.card=document.querySelector('t90-map-card');

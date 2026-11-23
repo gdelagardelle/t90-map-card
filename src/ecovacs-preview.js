@@ -6,7 +6,7 @@ import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { setupFurnishings } from './ecovacs-furnishings.js';
 import { setupWallEditor } from './ecovacs-wall-editor.js';
 import { RunTrail } from './ecovacs-run-trail.js';
-import { scan, scope } from './scene-context.js';
+import { scan, scope, dreame } from './scene-context.js';
 
 let lightScene;
 window.t90SetAppearance = look => {
@@ -23,6 +23,13 @@ const cameraButtons = [...document.querySelectorAll('[data-camera]')];
 const dockPin = document.querySelector('.dock-pin');
 const sourceButton = document.querySelector('[data-view="source"]');
 const routeButton = document.querySelector('[data-view="route"]');
+
+if (dreame) {
+  document.title = 'Dreame 3D vacuum map';
+  document.querySelector('.feed-label').textContent = 'Dreame map';
+  document.querySelector('[data-camera="follow"]').textContent = 'Follow robot';
+  document.querySelector('.device').setAttribute('aria-label','Vacuum map options');
+}
 
 const parsed = new SVGLoader().parse(scan);
 const drawing = parsed.xml;
@@ -271,7 +278,7 @@ function renderPreview() {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderPortrait(renderer);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.domElement.setAttribute('aria-label', 'Three-dimensional rendering of the saved Ecovacs floor map');
+  renderer.domElement.setAttribute('aria-label', 'Three-dimensional rendering of the vacuum floor map');
   renderer.domElement.setAttribute('role', 'img');
   renderer.domElement.tabIndex = 0;
   viewer.prepend(renderer.domElement);
@@ -838,7 +845,7 @@ function renderPreview() {
     const hasLayout = [scope + ':furniture',scope + ':walls'].some(key => localStorage.getItem(key));
     if (!hasLayout) {
       const hint = document.getElementById('layout-status');
-      hint.textContent = 'Ecovacs scan · Use Edit walls or Edit furnishings to customize your map.';
+      hint.textContent = 'Use Edit walls or Edit furnishings to customize your map.';
       hint.hidden = false;
     }
     replaceRoute(null);
@@ -849,7 +856,7 @@ function renderPreview() {
 
 compare.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(scan);
 compare.className = 'compare';
-compare.alt = 'Original Ecovacs map with floor outlines, dock, and saved cleaning path';
+compare.alt = 'Map with floor outlines, dock, and saved cleaning path';
 compare.hidden = true;
 viewer.prepend(compare);
 sourceButton.addEventListener('click', () => {

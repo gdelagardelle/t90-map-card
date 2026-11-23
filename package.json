@@ -4,7 +4,21 @@
   "private": true,
   "license": "MIT",
   "type": "module",
-  "scripts": {"build": "node build.mjs", "test": "node tests/browser.mjs"},
-  "dependencies": {"three": "0.186.0"},
-  "devDependencies": {"esbuild": "0.27.0", "playwright-core": "1.65.1"}
+  "scripts": {
+    "build": "node build.mjs && node testers/switchbot/build.mjs && node testers/vacuum-controls/build.mjs && node testers/valetudo/build.mjs",
+    "test": "npm run test:ecovacs && npm run test:dreame && npm run test:switchbot && npm run test:controls && npm run test:valetudo && node tests/geometry-regression.mjs",
+    "test:ecovacs": "node tests/browser.mjs",
+    "test:dreame": "node tests/l40s-tester.mjs && node tests/l40s-tester.mjs --races-only && node tests/two-dreames.mjs",
+    "test:switchbot": "node testers/switchbot/tests/rooms.mjs && node testers/switchbot/tests/resilience.mjs && node testers/switchbot/tests/card.mjs",
+    "test:controls": "node testers/vacuum-controls/tests/roomba-plus.mjs && node testers/vacuum-controls/tests/browser.mjs",
+    "test:valetudo": "node testers/valetudo/test.mjs",
+    "test:cross-browser": "node tests/cross-browser.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.27.0",
+    "playwright-core": "1.65.1"
+  }
 }
