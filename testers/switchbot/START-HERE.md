@@ -7,15 +7,19 @@ SwitchBot Cloud lists K10+, K10+ Pro, K10+ Pro Combo, K11+, K20+ Pro, S10, S20, 
 ## Install
 
 1. For a new SwitchBot Cloud setup, Home Assistant lists a SwitchBot Hub and a SwitchBot account as prerequisites. Enter the token and secret from the SwitchBot app into the Home Assistant integration setup. If the vacuum already appears in Home Assistant, open **Settings → Devices & services → SwitchBot Cloud**. Look up your robot's actual `vacuum.*` entity under its device. Confirm that it reports a state.
-2. Download the [bundled JavaScript module](../../dist/switchbot-vacuum-card.js) using GitHub’s **Download raw file** button, or use the module included in the tester ZIP. Copy `switchbot-vacuum-card.js` to `/config/www/switchbot-vacuum/` on Home Assistant. Add `/local/switchbot-vacuum/switchbot-vacuum-card.js?v=qa-2` under **Settings → Dashboards → Resources** as a JavaScript module. The Resources menu requires Advanced Mode in your Home Assistant profile. Reload the dashboard after saving.
-3. In the dashboard editor, add a Manual card. Replace the example entity ID with yours.
+2. Download the [bundled JavaScript module](../../dist/switchbot-vacuum-card.js) using GitHub’s **Download raw file** button, or use the module included in the tester ZIP. Copy `switchbot-vacuum-card.js` to `/config/www/switchbot-vacuum/` on Home Assistant. Add `/local/switchbot-vacuum/switchbot-vacuum-card.js?v=beta7` under **Settings → Dashboards → Resources** as a JavaScript module. The Resources menu requires Advanced Mode in your Home Assistant profile. Reload the dashboard after saving.
+3. In the dashboard editor, choose **SwitchBot Vacuum** from the card picker. For manual YAML, replace the example entity ID with yours.
 
 ```yaml
 type: custom:switchbot-vacuum-card
 entity: vacuum.your_switchbot
 ```
 
-To update a previous tester build, replace the file and change the resource URL's query string (use `?v=qa-2` for this build) so existing browsers load the new version.
+In the visual editor, select the vacuum to save a controls-only card, or choose a map and **Preview selected map** to inspect your floor before saving. For an existing install, replace the module at its original path and change the version query on the existing dashboard resource to `?v=beta7`. Your saved card configuration carries over.
+
+Open **Test details** on the card to review a snapshot of detected capabilities. **Refresh test details** takes a new snapshot. **Copy test details** copies exactly the displayed text for sharing. The report excludes entity IDs, room names, floor coordinates and images. Command results distinguish Home Assistant accepting a request from a later state change. Physical operation still needs an owner check.
+
+To update a previous tester build, replace the file and change the resource URL's query string (use `?v=beta7` for this build) so existing browsers load the new version.
 
 ## Maps and battery
 

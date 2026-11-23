@@ -20,13 +20,17 @@ Tests recorded the actual Home Assistant action and target in an isolated browse
 
 1. Download [vacuum-controls-card.js](../../dist/vacuum-controls-card.js) with GitHub’s **Download raw file** button. If you received the tester ZIP, extract the JS file instead.
 2. Copy it into Home Assistant’s configuration directory as `www/vacuum-controls-card.js`. If this is the first time you created `www`, restart Home Assistant.
-3. Go to **Settings → Dashboards → ⋮ → Resources**, then add `/local/vacuum-controls-card.js?v=1` as a **JavaScript module**. Enable Advanced Mode in your profile if Resources is hidden. On an upgrade, replace the file and change the version in the URL.
-4. Reload the dashboard. Add a **Manual** card using the entity ID of your own vacuum.
+3. Go to **Settings → Dashboards → ⋮ → Resources**, then add `/local/vacuum-controls-card.js?v=beta7` as a **JavaScript module**. Enable Advanced Mode in your profile if Resources is hidden. On an upgrade, replace the file and change the version in the URL.
+4. Reload the dashboard. Choose **Vacuum Controls** from the card picker, or use a **Manual** card with the entity ID of your own vacuum.
 
 ```yaml
 type: custom:vacuum-controls-card
 entity: vacuum.my_robot
 ```
+
+In the visual editor, select the vacuum to save a controls-only card, or choose a map and **Preview selected map** to inspect your floor before saving. For an existing install, replace the module at its original path and change the version query on the existing dashboard resource to `?v=beta7`. Your saved card configuration carries over.
+
+Open **Test details** on the card to review a snapshot of detected capabilities. **Refresh test details** takes a new snapshot. **Copy test details** copies exactly the displayed text for sharing. The report excludes entity IDs, room names, floor coordinates and images. Command results distinguish Home Assistant accepting a request from a later state change. Physical operation still needs an owner check.
 
 The module includes its interface and 3D renderer. There is no separate SwitchBot component to install. Optional `name` overrides the card title. Set `battery_entity: sensor.my_robot_battery` if the integration provides battery as a separate sensor.
 

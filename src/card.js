@@ -1,4 +1,5 @@
 import './editor.js';
+import {attachReport,trackCommand} from '../testers/companion-setup.js';
 import palette from './appearance.css';
 import cardStyles from './card.css';
 import sceneDocument from 't90-scene';
@@ -47,6 +48,7 @@ class T90MapCard extends HTMLElement {
       this.selectedRooms.clear();
       this.settingRows.clear();
       this.shadowRoot.replaceChildren(element('p','Choose a vacuum and its map in the card editor.'));
+      if (__DREAME_TESTER__) this.report=attachReport(this,this.shadowRoot,'dreame',()=>config,()=>({}));
       return;
     }
     const changed = this.config && (this.vacuum !== config.entity || this.image !== config.map_entity);
@@ -102,6 +104,7 @@ class T90MapCard extends HTMLElement {
       if (device) this.sourceDevice = device;
     }
     this.h = value;
+    if (__DREAME_TESTER__) this.report?.update();
     if (this.ui) this.refresh();
   }
   mapDevice(h) {
@@ -153,6 +156,10 @@ ${cardStyles}</style>
     <select aria-label="Ecovacs room name"></select><div class="actions"><button class="bind primary" disabled>Save room</button><button class="cancel">Cancel</button></div>
     <p class="binding-error" aria-live="polite"></p></dialog></ha-card>`;
     this.ui = this.shadowRoot.querySelector('.panel');
+    if (__DREAME_TESTER__) this.report=attachReport(this,this.ui,'dreame',()=>this.config,()=>({
+      map3d:this.mapReady,rooms:this.mapReady && this.nativeRooms?.labels?.size>0 && !!this.h?.services?.dreame_vacuum?.vacuum_clean_segment,
+      position:this.mapReady && this.overlay?.xy,trail:this.mapReady && this.overlay?.route
+    }));
     this.frame = this.shadowRoot.querySelector('iframe');
     this.q = sel => this.shadowRoot.querySelector(sel);
     const preferenceKey = 't90:' + this.vacuum + ':' + this.image + ':appearance';
@@ -278,7 +285,9 @@ ${cardStyles}</style>
     if (this.busy || !entity || !this.isConnected || this.h?.connected === false) return;
     this.busy = true; this.refresh();
     try {
-      await this.h.callService(domain,service,data,{entity_id:entity});
+      const dispatch=()=>this.h.callService(domain,service,data,{entity_id:entity});
+      if(__DREAME_TESTER__)await trackCommand(this,this.vacuum,service,dispatch);
+      else await dispatch();
       this.note('Command sent · ' + title(service));
     } catch (err) { this.note('Command failed · ' + (err.message || 'Home Assistant rejected the request')); }
     finally { this.busy = false; this.refresh(); }
@@ -613,7 +622,7 @@ ${cardStyles}</style>
       if (this.dreame || this.selectedRooms.size) this.q('[data-action=start]').disabled = true;
       this.note('Map update unavailable · '+err.message);
       this.mapVersion=[stamp,v.state,h.states[this.entityIdFor('event','last_job')]?.state].join('|');
-    } finally {this.fetching=false;}
+    } finally {this.fetching=false;if (__DREAME_TESTER__) this.report?.update();}
   }
 }
 if (!customElements.get(__CARD_TYPE__)) customElements.define(__CARD_TYPE__, T90MapCard);

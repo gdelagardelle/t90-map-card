@@ -1,31 +1,39 @@
 import scene from 'valetudo-scene';
 import { convertMap, decodeMapCamera, readBounded } from './map.js';
 
+import {attachReport,registerEditor} from '../companion-setup.js';
+const editor=registerEditor('valetudo','valetudo-map-card',undefined,{parse:async bytes=>convertMap(await decodeMapCamera(bytes))});
 function available(state) {
   return state && !['unknown','unavailable'].includes(state.state);
 }
 
 class ValetudoMapCard extends HTMLElement {
+  static getConfigElement(){return document.createElement(editor);}
+  static getStubConfig(){return {};}
   constructor(){
     super();
     const root=this.attachShadow({mode:'open'});
     root.innerHTML='<style>:host{display:block}ha-card{display:block;overflow:hidden}.status{margin:0;padding:14px;color:var(--primary-text-color);font:inherit}.status:empty{display:none}iframe{display:block;border:0;width:100%;height:clamp(390px,58vh,620px)}[hidden]{display:none!important}</style><ha-card><p class="status" role="status"></p><div></div></ha-card>';
     this.message=root.querySelector('.status');
     this.slotBox=root.querySelector('div');
+    this.report=attachReport(this,root.querySelector('ha-card'),'valetudo',()=>({entity:this.config?.entity,map_entity:this.config?.camera}),()=>{
+      const shown=this.frame && !this.frame.hidden;
+      return {map3d:shown,position:shown && this.sample?.xy,trail:shown && this.sample?.route};
+    });
   }
 
   setConfig(config){
-    if(!/^vacuum\.\w+$/.test(config.entity)||!/^camera\.\w+$/.test(config.map_entity)){
+    if((config.entity && !/^vacuum\.\w+$/.test(config.entity))||(config.map_entity && !/^camera\.\w+$/.test(config.map_entity))){
       throw Error('Set entity to your MQTT vacuum and map_entity to its Map data camera.');
     }
     const next={entity:config.entity,camera:config.map_entity,appearance:config.appearance==='night'?'night':'daylight'};
-    if(this.config?.entity!==next.entity||this.config.camera!==next.camera)this.reset();
+    if(this.config?.entity!==next.entity||this.config?.camera!==next.camera)this.reset();
     this.config=next;
     this.frame?.contentWindow?.t90SetAppearance?.(next.appearance);
-    this.check();
+    this.check();this.report.update();
   }
 
-  set hass(value){this.h=value;this.check();}
+  set hass(value){this.h=value;this.check();this.report.update();}
   getCardSize(){return 8;}
   connectedCallback(){
     this.timer=setInterval(()=>this.check(true),5000);
@@ -89,7 +97,7 @@ class ValetudoMapCard extends HTMLElement {
       if(this.frame)this.frame.hidden=true;
       this.message.textContent=controller.signal.aborted?'Map camera timed out.':(error.message || 'Could not read the Valetudo map.');
     }finally{
-      clearTimeout(timeout);
+      this.report.update();clearTimeout(timeout);
       if(this.request===controller)this.request=null;
     }
   }

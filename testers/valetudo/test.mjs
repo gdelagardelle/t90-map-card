@@ -69,6 +69,17 @@ try{
  const card=page.locator('valetudo-map-card'),frame=card.frameLocator('iframe');
  const viewer=frame.locator('.viewer');
  await frame.locator('[data-regions="2"][data-tracking="live"]').waitFor();
+ await page.evaluate(()=>{
+   const editor=customElements.get('valetudo-map-card').getConfigElement();
+   document.body.append(editor);editor.setConfig({entity:'vacuum.robot',map_entity:'camera.robot_map'});editor.hass=h;
+ });
+ const editor=page.locator('valetudo-map-card-editor');
+ await editor.getByRole('button',{name:'Preview selected map'}).click();
+ await editor.getByAltText('Floor outline from the selected map').waitFor();
+ await editor.getByText('Test details',{exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('valetudo-map-card-editor').shadowRoot.querySelector('textarea').value);
+ assert.match(await editor.getByRole('textbox').inputValue(),/3D floor available/);
+ await editor.evaluate(el=>el.remove());
  assert.equal(await viewer.getAttribute('data-robot-position'),'11,11');
  assert.equal(await viewer.getAttribute('data-dock'),'true');
  assert.equal(await viewer.getAttribute('data-trace-segments'),'3');

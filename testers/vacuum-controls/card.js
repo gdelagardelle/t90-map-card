@@ -2,6 +2,8 @@ import '../switchbot/switchbot-floorplan.js';
 import {getRoombaFloor,getRoombaRoomTargets,startRoombaRooms} from './roomba-plus.js';
 import {RoombaTrail} from './roomba-trail.js';
 
+import {attachReport,registerEditor,trackCommand} from '../companion-setup.js';
+const editor=registerEditor('controls','vacuum-controls-card',undefined,{floor:getRoombaFloor});
 const actions = [
   ['start',8192,'Start'],['pause',4,'Pause'],['stop',8,'Stop'],
   ['return_to_base',16,'Go home'],['locate',512,'Locate'],['clean_spot',1024,'Spot clean']
@@ -10,6 +12,8 @@ const available = state => !!state && !['unknown','unavailable'].includes(state.
 const online = hass => !!hass && hass.connected !== false && hass.connection?.connected !== false;
 
 class VacuumControlsCard extends HTMLElement {
+  static getConfigElement(){return document.createElement(editor);}
+  static getStubConfig(){return {};}
   constructor() {
     super();
     this.selected=new Set();this.pending=new Set();this.trail=new RoombaTrail();
@@ -36,13 +40,17 @@ class VacuumControlsCard extends HTMLElement {
       const b=document.createElement('button');b.type='button';b.textContent=name;b.dataset.action=key;b.onclick=()=>this.run(key);
       this.q('.actions').append(b);
     }
+    this.report=attachReport(this,this.q('ha-card'),'controls',()=>this.config,()=>({
+      map3d:!!this.planShown,map2d:!!this.picture,rooms:this.config && this.h && this.targets().length>0,
+      position:this.trail.points.length>0,trail:this.trail.points.length>1
+    }));
     this.q('select').onchange=e=>this.run('set_fan_speed',e.target.value);
     this.resize=new ResizeObserver(()=>this.trail.draw(this.q('canvas')));
   }
   connectedCallback(){this.resize.observe(this.q('canvas'));}
   disconnectedCallback(){this.resize.disconnect();this.trail.clear();this.mapRequest=null;}
   setConfig(config) {
-    if(!/^vacuum\.\w+$/.test(config.entity || '')) throw Error('Set entity to a Home Assistant vacuum.');
+    if(config.entity && !/^vacuum\.\w+$/.test(config.entity || '')) throw Error('Set entity to a Home Assistant vacuum.');
     if(config.map_entity && !/^(image|camera)\.\w+$/.test(config.map_entity)) throw Error('map_entity requires an image or camera.');
     if(config.battery_entity && !/^sensor\.\w+$/.test(config.battery_entity)) throw Error('battery_entity requires a sensor.');
     if(config.map_entity && config.floor_plan) throw Error('Choose a map_entity or a floor_plan.');
@@ -113,9 +121,9 @@ class VacuumControlsCard extends HTMLElement {
       const targets=[...this.selected];
       let sent;
       if(key==='start'&&targets.length){
-        if(this.platform==='roomba_plus')sent=startRoombaRooms(this.h,entity,map_entity,targets);
-        else if(this.platform==='sharkiq')sent=this.h.callService('sharkiq','clean_room',{rooms:targets},{entity_id:entity});
-      }else sent=this.h.callService('vacuum',key,key==='set_fan_speed'?{fan_speed:value}:{},{entity_id:entity});
+        if(this.platform==='roomba_plus')sent=trackCommand(this,entity,'clean_room',()=>startRoombaRooms(this.h,entity,map_entity,targets));
+        else if(this.platform==='sharkiq')sent=trackCommand(this,entity,'clean_room',()=>this.h.callService('sharkiq','clean_room',{rooms:targets},{entity_id:entity}));
+      }else sent=trackCommand(this,entity,key,()=>this.h.callService('vacuum',key,key==='set_fan_speed'?{fan_speed:value}:{},{entity_id:entity}));
       this.render();await sent;
     }catch(e){if(this.config===config)this.q('.notice').textContent=e?.message || 'Robot command failed.';}
     finally{this.pending.delete(entity);this.render();}
@@ -145,13 +153,13 @@ class VacuumControlsCard extends HTMLElement {
       if(this.mapRequest!==req)return;
       const el=helpers.createCardElement({type:'picture-entity',entity:map_entity,show_state:false,show_name:false,
         ...(map_entity.startsWith('camera.')?{camera_image:map_entity}:{}),tap_action:{action:'more-info'}});
-      el.hass=this.h;this.picture={id:map_entity,el};box.replaceChildren(el);
+      el.hass=this.h;this.picture={id:map_entity,el};box.replaceChildren(el);this.report.update();
     }).catch(()=>{if(this.mapRequest===req){box.textContent='Could not load the map entity.';this.mapRequest=null;}});
   }
   render(){
     if(!this.config||!this.h)return;
     const v=this.vacuum,h=this.h,active=online(h);
-    this.q('h2').textContent=this.config.name || v?.attributes.friendly_name || this.config.entity;
+    this.q('h2').textContent=this.config.name || v?.attributes.friendly_name || this.config.entity || 'Choose your vacuum in the card editor.';
     let status=active ? v ? h.formatEntityState?.(v)||v.state : 'Entity unavailable' : 'Home Assistant disconnected';
     const battery=this.config.battery_entity?h.states[this.config.battery_entity]?.state:v?.attributes.battery_level;
     if(active&&available(v)&&battery!=null&&String(battery).trim()&&Number.isFinite(Number(battery))&&Number(battery)>=0&&Number(battery)<=100)status+=' · '+battery+'% battery';
@@ -181,7 +189,7 @@ class VacuumControlsCard extends HTMLElement {
     if(this.trailSource!==trailSource){this.trail.clear();this.trailSource=trailSource;}
     if(active && available(v) && ['roomba','roomba_plus'].includes(this.platform))this.trail.observe(v);
     else this.trail.clear();
-    this.q('.trail').hidden=!this.trail.points.length;this.trail.draw(this.q('canvas'));
+    this.q('.trail').hidden=!this.trail.points.length;this.trail.draw(this.q('canvas'));this.report.update();
   }
 }
 if(!customElements.get('vacuum-controls-card'))customElements.define('vacuum-controls-card',VacuumControlsCard);

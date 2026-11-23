@@ -1,3 +1,5 @@
+import {registerEditor} from '../testers/companion-setup.js';
+import {parseDreameMap} from './dreame-map.js';
 export class T90ConfigEditor extends HTMLElement {
   constructor() { super(); this.attachShadow({mode:'open'}); }
   setConfig(value) { this.config = {...value}; this.render(); }
@@ -27,4 +29,5 @@ export class T90ConfigEditor extends HTMLElement {
     }
   }
 }
-if (!customElements.get(__EDITOR_TYPE__)) customElements.define(__EDITOR_TYPE__,T90ConfigEditor);
+if (__DREAME_TESTER__) registerEditor('dreame',__CARD_TYPE__,__EDITOR_TYPE__,{parse:(bytes,attrs)=>parseDreameMap(new TextDecoder().decode(bytes),attrs?.rooms)});
+else if (!customElements.get(__EDITOR_TYPE__)) customElements.define(__EDITOR_TYPE__,T90ConfigEditor);

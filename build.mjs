@@ -4,7 +4,8 @@ const scene = await build({entryPoints:['src/ecovacs-preview.js'],bundle:true,mi
 const template = await readFile('src/scene.html','utf8');
 const palette = await readFile('src/appearance.css','utf8');
 const html = template.replace('/* APPEARANCE */', () => palette).replace('/* INSERT_BUNDLE */', () => scene.outputFiles[0].text.replace(/<\/script/gi,'<\\/script'));
-for (const tester of [false,true]) {
+const variants=process.argv.includes('--dreame-only') ? [true] : [false,true];
+for (const tester of variants) {
   const cardType = tester ? 'dreame-map-card-beta' : 't90-map-card';
   await build({entryPoints:['src/card.js'],bundle:true,minify:true,format:'esm',loader:{'.css':'text'},supported:{'template-literal':false},legalComments:'inline',outfile:'dist/'+cardType+'.js',
     define:{__DREAME_TESTER__:String(tester),__CARD_TYPE__:JSON.stringify(cardType),__EDITOR_TYPE__:JSON.stringify(tester ? 'dreame-map-editor-beta' : 't90-map-editor')},

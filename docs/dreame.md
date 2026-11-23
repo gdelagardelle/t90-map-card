@@ -8,7 +8,7 @@ The integration lists four L40s Pro Ultra variants, with model codes `dreame.vac
 
 1. In Home Assistant, confirm the Dreame integration shows your vacuum and that its **current floor map camera** displays the correct floor. Both entities must be registered to the same device. Choose the regular map camera, rather than its history, saved, Wi-Fi, recovery or Map Data variants.
 2. [Download the Dreame JavaScript module](../dist/dreame-map-card-beta.js) using the **Download raw file** button on GitHub. Copy `dreame-map-card-beta.js` into your Home Assistant config directory under `www/`. If this is the first time you have created the `www` directory, restart Home Assistant.
-3. Under **Settings → Dashboards → ⋮ → Resources**, add `/local/dreame-map-card-beta.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. If you already installed an earlier Dreame tester at this path, replace the file, update the existing resource URL to `/local/dreame-map-card-beta.js?v=2` and reload the dashboard.
+3. Under **Settings → Dashboards → ⋮ → Resources**, add `/local/dreame-map-card-beta.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. If you already installed an earlier Dreame tester at this path, replace the file, update the existing resource URL to `/local/dreame-map-card-beta.js?v=beta7` and reload the dashboard.
 4. Add **Dreame 3D Map (beta)** from the dashboard card picker, or add a Manual card with the following configuration. Substitute the vacuum and camera IDs from step 1.
 
 ```yaml
@@ -16,6 +16,10 @@ type: custom:dreame-map-card-beta
 entity: vacuum.my_dreame
 map_entity: camera.my_dreame_map
 ```
+
+In the visual editor, select the vacuum and map, then choose **Preview selected map** to see your floor before saving. For an existing install, replace the module at its original path and change the version query on the existing dashboard resource to `?v=beta7`. Your saved card configuration carries over.
+
+Open **Test details** on the card to review a snapshot of detected capabilities. **Refresh test details** takes a new snapshot. **Copy test details** copies exactly the displayed text for sharing. The report excludes entity IDs, room names, floor coordinates and images. Command results distinguish Home Assistant accepting a request from a later state change. Physical operation still needs an owner check.
 
 The Dreame tester has its own module, card type and editor. It can share a dashboard with the stable T90 card. [Home Assistant dashboard resources](https://developers.home-assistant.io/docs/frontend/custom-ui/registering-resources/)
 

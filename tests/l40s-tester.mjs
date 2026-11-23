@@ -45,6 +45,11 @@ try {
     }
     assert.deepEqual(await page.evaluate(()=>dreameDemo.calls.map(call=>[call[0],call[1],call[3].entity_id])),
       ['start','pause','start','stop','return_to_base'].map(action=>['vacuum',action,'vacuum.l40s_pro_ultra']));
+    const details=card.locator('details').filter({has:page.getByText('Test details',{exact:true})});
+    await details.locator('summary').click();
+    await page.waitForFunction(()=>document.querySelector('dreame-map-card-beta').report.querySelector('textarea').value);
+    assert.match(await details.getByRole('textbox').inputValue(),/Go home · accepted by Home Assistant · physical result unconfirmed/);
+    await details.locator('summary').click();
     await page.evaluate(()=>{dreameDemo.calls.length=0;});
     await card.evaluate(async c=>{
       c.h.states[c.vacuum].state='cleaning';

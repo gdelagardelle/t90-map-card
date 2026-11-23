@@ -12,7 +12,7 @@ Use this card with a compatible robot **already running Valetudo**. The card rea
 
 1. Open [valetudo-map-card.js](../../dist/valetudo-map-card.js) on GitHub and select **Download raw file**. Copy the module into `config/www/`.
 2. Add `/local/valetudo-map-card.js` under **Settings → Dashboards → Resources** as a **JavaScript module**, then reload. Enable Advanced Mode in your profile if needed.
-3. Add a Manual card and replace the two example entity IDs with the ones on your Valetudo MQTT device.
+3. Choose **Valetudo 3D Map** in the dashboard card picker, or use the following Manual card with your MQTT entities.
 
 ```yaml
 type: custom:valetudo-map-card
@@ -20,6 +20,10 @@ entity: vacuum.my_robot
 map_entity: camera.my_robot_map_data
 appearance: daylight
 ```
+
+In the visual editor, select the vacuum and map, then choose **Preview selected map** to see your floor before saving. For an existing install, replace the module at its original path and change the version query on the existing dashboard resource to `?v=beta7`. Your saved card configuration carries over.
+
+Open **Test details** on the card to review a snapshot of detected capabilities. **Refresh test details** takes a new snapshot. **Copy test details** copies exactly the displayed text for sharing. The report excludes entity IDs, room names, floor coordinates and images. This map viewer sends no robot commands.
 
 Use `appearance: night` for the dark view. The card polls Home Assistant every five seconds while visible. MQTT can retain the last map, so an idle robot may show its last recorded route. If the camera disconnects or returns an ordinary image, the card reports the problem and waits for a valid map.
 

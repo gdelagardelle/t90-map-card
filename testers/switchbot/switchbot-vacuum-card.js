@@ -2,12 +2,16 @@
 import "./switchbot-floorplan.js";
 import { getRoomTargets, isHassConnected, startRoomCleaning } from "./switchbot-rooms.js";
 
+import {attachReport,registerEditor,trackCommand} from '../companion-setup.js';
+const editor = registerEditor('switchbot','switchbot-vacuum-card');
 const feature = { start: 8192, pause: 4, stop: 8, return_to_base: 16, set_fan_speed: 32 };
 const labels = { start: "Start", pause: "Pause", stop: "Stop", return_to_base: "Go home" };
 const icons = { start: "play", pause: "pause", stop: "stop", return_to_base: "home-import-outline" };
 const isAvailable = entity => entity && !["unknown", "unavailable"].includes(entity.state);
 
 class SwitchBotVacuumCard extends HTMLElement {
+  static getConfigElement(){return document.createElement(editor);}
+  static getStubConfig(){return {};}
   constructor() {
     super();
     this.selected = new Set();
@@ -52,11 +56,14 @@ class SwitchBotVacuumCard extends HTMLElement {
       b.onclick = () => this.run(service);
       this.$(".controls").append(b);
     }
+    this.report=attachReport(this,this.$('ha-card'),'switchbot',()=>this.config,()=>({
+      map3d:!!this.planView, map2d:!!this.mapCard, rooms:getRoomTargets(this.h,this.config?.entity,this.config?.room_selection===true).length>0
+    }));
     this.$("select").onchange = e => this.run("set_fan_speed", e.target.value);
   }
 
   setConfig(config) {
-    if (!/^vacuum\.\w+$/.test(config.entity || "")) throw Error("Set entity to your SwitchBot vacuum entity ID.");
+    if (config.entity && !/^vacuum\.\w+$/.test(config.entity || "")) throw Error("Set entity to your SwitchBot vacuum entity ID.");
     if (config.map_entity && !/^(camera|image)\.\w+$/.test(config.map_entity)) throw Error("Select an image or camera for map_entity.");
     if (config.floor_plan && config.map_entity) throw Error("Choose either floor_plan or map_entity.");
     if (config.floor_plan && !Array.isArray(config.floor_plan.rooms)) throw Error("floor_plan requires a rooms list.");
@@ -104,7 +111,7 @@ class SwitchBotVacuumCard extends HTMLElement {
       });
       card.hass = this.h;
       this.mapCard = card;
-      map.replaceChildren(card);
+      map.replaceChildren(card);this.report.update();
     } catch {
       if (this.mapRequest === request) map.textContent = "Could not load the map source.";
     } finally { request.pending = false; }
@@ -113,7 +120,8 @@ class SwitchBotVacuumCard extends HTMLElement {
   render() {
     if (!this.h || !this.config) return;
     const v = this.h.states[this.config.entity];
-    this.$("h2").textContent = this.config.name || v?.attributes.friendly_name || this.config.entity;
+    if(!this.config.entity){this.$("h2").textContent="Choose your SwitchBot vacuum in the card editor.";}
+    else this.$("h2").textContent = this.config.name || v?.attributes.friendly_name || this.config.entity;
     const online = isHassConnected(this.h);
     const platform = this.h.entities?.[this.config.entity]?.platform;
     const wrongPlatform = platform && !["switchbot_cloud", "switchbot_vacuum"].includes(platform);
@@ -170,6 +178,7 @@ class SwitchBotVacuumCard extends HTMLElement {
     }
     select.value = speeds.includes(v?.attributes.fan_speed) ? v.attributes.fan_speed : "";
     select.disabled = !available || this.busy;
+    this.report.update();
     this.$("label").hidden = !(v?.attributes.supported_features & feature.set_fan_speed) || !this.h.services?.vacuum?.set_fan_speed || !speeds.length;
   }
 
@@ -222,9 +231,9 @@ class SwitchBotVacuumCard extends HTMLElement {
     this.render();
     try {
       if (service === "start" && this.selected.size) {
-        await startRoomCleaning(this.h, id, this.config.room_selection === true, [...this.selected]);
+        await trackCommand(this,id,'clean_rooms',()=>startRoomCleaning(this.h,id,this.config.room_selection===true,[...this.selected]));
       } else {
-        await this.h.callService("vacuum",service,service==="set_fan_speed"?{fan_speed:value}:{},{entity_id:id});
+        await trackCommand(this,id,service,()=>this.h.callService("vacuum",service,service==="set_fan_speed"?{fan_speed:value}:{},{entity_id:id}));
       }
     } catch (e) {
       if (sentConfig === this.config) this.$(".notice").textContent = e?.message || "The vacuum action failed.";
