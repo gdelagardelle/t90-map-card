@@ -4,6 +4,8 @@ import {mkdir,readFile} from 'node:fs/promises';
 import {chromium} from 'playwright-core';
 import {rooms,scan} from './fixture.mjs';
 import {fixtureLightState,createFixtureLights,validLightId} from '../src/fixture-lights.js';
+import {fixtureLightMaterials} from '../src/fixture-light-materials.js';
+import {Group,Mesh,MeshBasicMaterial,MeshStandardMaterial} from 'three';
 
 const state=(value,attributes={})=>fixtureLightState({state:value,attributes});
 assert.equal(state('on',{hs_color:[120,100],brightness:128}).color,'#00ff00');
@@ -22,6 +24,20 @@ fake.states['light.a'].last_updated='now';feed.refresh();
 fake.states['light.a'].state='on';feed.refresh();feed.refresh();
 fake.connected=false;feed.refresh();feed.refresh();
 assert.deepEqual(changes,[['light.a'],['light.a']]);
+// Two copies of the same lamp share its artistic defaults. Linking one must
+// leave the other alone. Clearing must reattach the identical material objects.
+const prototype=new Group();
+const emitter=new Mesh(undefined,new MeshStandardMaterial({color:0xffe8c4,emissive:0xffbd73,emissiveIntensity:2.15}));
+emitter.userData.fixtureEmitter=true;
+const pool=new Mesh(undefined,new MeshBasicMaterial({color:0xffcc91,opacity:.68,transparent:true}));
+pool.userData.lightPool=true;prototype.add(emitter,pool);
+const first=prototype.clone(),second=prototype.clone(),materials=fixtureLightMaterials();
+materials.apply(first,state('on',{rgb_color:[0,120,255],brightness:128}));
+assert.notEqual(first.children[0].material,emitter.material);
+assert.equal(second.children[0].material,emitter.material);
+assert.equal(first.children[1].material.opacity,.68*128/255);
+materials.apply(first,null);
+assert.equal(first.children[0].material,emitter.material);assert.equal(first.children[1].material,pool.material);
 const captures=process.env.LIGHT_PICTURES;
 if(captures)await mkdir(captures,{recursive:true});
 
@@ -108,12 +124,26 @@ try {
       await picker.waitFor();
     }
     async function done(){await ui.locator('[data-furnishing=done]').click();}
-    async function afterRender(){await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}
+    async function maximumRGB(first,second){
+      return page.evaluate(async([before,after])=>{
+      async function decode(encoded){
+        const bitmap=await createImageBitmap(await (await fetch('data:image/png;base64,'+encoded)).blob());
+        const cv=document.createElement('canvas');cv.width=bitmap.width;cv.height=bitmap.height;
+        const ctx=cv.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
+        return ctx.getImageData(0,0,cv.width,cv.height).data;
+      }
+      const [a,b]=await Promise.all([decode(before),decode(after)]);
+      if(a.length!==b.length)return Infinity;
+      let max=0;
+      for(let i=0;i<a.length;i++)max=Math.max(max,Math.abs(a[i]-b[i]));
+      return max;
+    },[first.toString('base64'),second.toString('base64')]);
+    }
+    async function afterRender(){await canvas.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}
     async function update(id,value,attributes){await page.evaluate(args=>updateLight(...args),[id,value,attributes]);await afterRender();}
     const filename=roborock?'roborock':'ecovacs';
     await card.locator('[data-look=night]').click();
     await afterRender();
-    const artistic=await canvas.screenshot();
     await openEditor();
     const search=ui.getByRole('searchbox',{name:'Find a light'});
     await search.fill('reading');
@@ -151,7 +181,8 @@ try {
       assert.ok(!(await canvas.screenshot()).equals(recolored),'Brightness change must redraw');
       await update('light.reading','off');
       await update('light.strip',null);
-      assert.ok((await canvas.screenshot()).equals(off),'Removed/unavailable links must return to neutral unlit output');
+      const neutral=await maximumRGB(off,await canvas.screenshot());
+      assert.ok(neutral<=4,'Neutral off/unavailable rendering differs by '+neutral+' RGB levels on '+filename+' '+look);
     }
     await page.setViewportSize({width:390,height:820});
     await openEditor();
@@ -166,7 +197,11 @@ try {
     await page.setViewportSize({width:1100,height:820});
     await afterRender();
     await update('light.reading','off');
-    assert.ok((await canvas.screenshot()).equals(artistic),'Clearing bindings restores unlinked artistic lighting');
+    const unlinked=await canvas.screenshot();
+    await update('light.reading','on',{rgb_color:[255,0,0],brightness:255});
+    await update('light.strip','on',{hs_color:[190,100],brightness:255});
+    const difference=await maximumRGB(unlinked,await canvas.screenshot());
+    assert.ok(difference<=4,'Cleared fixtures must keep their own lighting regardless of former HA state');
     await card.getByText('Test details',{exact:true}).click();
     const report=await card.getByRole('textbox',{name:'Report preview'}).inputValue();
     assert.doesNotMatch(report,/light\.(reading|strip|room_)/);

@@ -291,7 +291,7 @@ function review(card,entry,refresh){
         listKey=JSON.stringify(roomList(card));
       }catch(err){start.disabled=true;verified=null;if(!pending)say(err.message);return null;}
       const key=frameKey(card);
-      if(verified?.key!==key || verified.rooms!==listKey){
+      if(!verified || verified.key!==key || verified.rooms!==listKey){
         start.disabled=true;
         if(!checking && !pending){
           checking=true;say('Checking the current floor…');
@@ -319,7 +319,10 @@ export function mountRoutines(card){
   const details=el('details'),summary=el('summary','Cleaning routines'),content=el('div'),select=el('select'),actions=el('div'),note=el('p');
   details.className='cleaning-routines';actions.className='actions';content.className='content';select.setAttribute('aria-label','Saved routine');note.setAttribute('role','status');
   const choice=()=>list(card).find(entry=>JSON.stringify([entry.scope,entry.r.id])===select.value);
-  const safe=fn=>()=>{try{note.textContent='';fn();}catch(err){note.textContent=err.message;}};
+  const safe=fn=>()=>{try{
+    check(!card.routineReview?.pending,'Wait for the current routine request to finish.');
+    note.textContent='';fn();
+  }catch(err){note.textContent=err.message;}};
   let signature='';
   function refresh(id,scope){
     if(!card.config)return;

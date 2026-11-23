@@ -44,10 +44,14 @@ try{
           calls.push([domain,service,data,target]);
           if(service==='select_option'){
             if(window.failSetting)throw Error('Fixture rejected setting');
+            if(window.holdMop)await new Promise(resolve=>{window.releaseSetting=resolve;});
             if(window.disconnectOnMop)hass.connected=false;
             hass.states[target.entity_id].state=data.option;
           }
-          if(service==='set_fan_speed')hass.states[target.entity_id].attributes.fan_speed=data.fan_speed;
+          if(service==='set_fan_speed'){
+            hass.states[target.entity_id].attributes.fan_speed=data.fan_speed;
+            if(window.refreshOnFan){hass.states['image.map'].state='setting-update';card.hass=hass;}
+          }
         }};
       card.setConfig(structuredClone(config));card.hass=hass;
     },{raster,xml:scan()});
@@ -76,7 +80,10 @@ try{
     modal=await review();const start=modal.getByRole('button',{name:'Start routine'});
     await start.waitFor();await page.waitForFunction(()=>!card.q('.routine-review .primary')?.disabled);
     assert.deepEqual(await page.evaluate(()=>calls),[]);
-    const shown=()=>page.evaluate(raster=>raster?card.frame.t90Map.selected:card.frame.contentDocument.querySelector('.viewer').dataset.selectedRooms.split(',').filter(Boolean).map(Number),raster);
+    const shown=async()=>{
+      if(!raster)await page.waitForFunction(()=>card.frame.contentDocument?.querySelector('.viewer')?.hasAttribute('data-selected-rooms'));
+      return page.evaluate(raster=>raster?card.frame.t90Map.selected:card.frame.contentDocument.querySelector('.viewer').dataset.selectedRooms.split(',').filter(Boolean).map(Number),raster);
+    };
     assert.deepEqual(await shown(),[1]);assert.deepEqual(await page.evaluate(()=>[...card.selectedRooms]),[2]);
     const priorReads=await page.evaluate(()=>{
       const old=mapReads;hass.states['image.map'].state='second';card.hass=hass;
@@ -85,6 +92,11 @@ try{
     await page.waitForFunction(()=>card.mapStamp==='second' && card.mapReady && !card.q('.routine-review .primary')?.disabled);
     assert.deepEqual(await shown(),[1]);assert.deepEqual(await page.evaluate(()=>calls),[]);
     assert.ok(await page.evaluate(()=>mapReads)-priorReads<=2,'Repeated state refresh should share verification');
+    assert.ok(await page.locator('[data-action=start]').isDisabled());
+    await page.evaluate(()=>card.control('start'));assert.deepEqual(await page.evaluate(()=>calls),[]);
+    await modal.getByRole('button',{name:'Close'}).click();
+    assert.deepEqual(await shown(),[2]);
+    modal=await review();
     await page.evaluate(async raster=>{
       if(raster){
         const cv=document.createElement('canvas');cv.width=194;cv.height=146;const ctx=cv.getContext('2d');
@@ -101,14 +113,11 @@ try{
     },raster);
     await page.waitForFunction(()=>card.mapReady && card.mapStamp==='restored' && !card.q('.routine-review .primary')?.disabled);
     assert.deepEqual(await shown(),[1]);
-    if(!raster)await page.evaluate(()=>{card.selectedRooms.add(2);card.refresh();});
 
-    assert.ok(await page.locator('[data-action=start]').isDisabled());
-    await page.evaluate(()=>card.control('start'));assert.deepEqual(await page.evaluate(()=>calls),[]);
-    await modal.getByRole('button',{name:'Close'}).click();
-    assert.deepEqual(await shown(),[2]);
-    modal=await review();
+
+    await page.evaluate(()=>{window.refreshOnFan=true;});
     await start.click();await modal.getByText('Start sent for Evening.').waitFor();
+    assert.equal(await page.evaluate(()=>card.mapStamp),'setting-update');
     const calls=await page.evaluate(()=>window.calls);
     assert.deepEqual(calls.slice(0,2),[['vacuum','set_fan_speed',{fan_speed:'turbo'},{entity_id:'vacuum.demo'}],
       ['select','select_option',{option:'high'},{entity_id:'select.demo_mop_mode'}]]);
@@ -148,12 +157,27 @@ try{
     await modal.getByRole('button',{name:'Start routine'}).click();await modal.getByText('Start sent for Upstairs.').waitFor();
     assert.deepEqual(await page.evaluate(()=>calls.map(c=>[c[0],c[1]])),[['vacuum','start']]);
     await modal.getByRole('button',{name:'Close'}).click();
+    await page.evaluate(()=>{window.beforeRemoval=structuredClone(card.config);});
     await panel.getByRole('button',{name:'Remove',exact:true}).click();modal=page.getByRole('dialog',{name:'Remove routine'});
     await modal.getByRole('button',{name:'Cancel'}).click();
     assert.equal(await page.evaluate(()=>dashboard.views[0].cards[0].maps[card.scope].routines.length),1);
     await panel.getByRole('button',{name:'Remove',exact:true}).click();await modal.getByRole('button',{name:'Remove routine'}).click();
     await modal.waitFor({state:'detached'});assert.equal(await page.evaluate(()=>dashboard.views[0].cards[0].maps[card.scope].routines.length),0);
     assert.deepEqual(await page.evaluate(()=>dashboard.views[0].cards[1]),{type:'clock'});assert.deepEqual(errors,[]);
+    await page.evaluate(()=>{
+      calls.length=0;card.cancelStartWatch();card.setConfig(beforeRemoval);hass.states['select.demo_mop_mode'].state='low';
+      window.holdMop=true;card.refresh();
+    });
+    modal=await review();await modal.getByRole('button',{name:'Start routine'}).click();
+    await page.waitForFunction(()=>typeof window.releaseSetting==='function');
+    const released=await page.evaluate(()=>{
+      card.setConfig({...beforeRemoval,entity:'vacuum.replacement'});
+      const unlocked=!card.busy && !card.routineLock && !card.routineReview;
+      card.busy=true;releaseSetting();return unlocked;
+    });
+    assert.ok(released);await page.waitForFunction(()=>hass.states['select.demo_mop_mode'].state==='high');
+    assert.ok(await page.evaluate(()=>card.busy),'Old callbacks may not release a new command lock');
+    assert.deepEqual(await page.evaluate(()=>calls.map(c=>c[1])),['select_option']);assert.deepEqual(errors,[]);
     await page.close();console.log('Passed '+(raster?'Roborock':'Ecovacs')+' routines, room/whole-home start, settings, failure handling, rematch, rename and remove.');
   }
 }finally{await browser.close();await new Promise(r=>server.close(r));}
