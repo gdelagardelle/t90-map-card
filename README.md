@@ -1,8 +1,8 @@
 # T90 3D Map Card
 
-Build an editable 3D floor plan from your robot’s map in Home Assistant. [Beta 7](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.7) includes the Ecovacs T90 and Roborock Qrevo map editors. T90 owners get a compact control panel, a brighter traveling light along the cleaning path, and a model-specific Start fix for the T90 MAX PLUS OMNI. During a selected-room clean, map updates keep the command status steady. All screenshots use fictional maps.
+Build an editable 3D floor plan from your vacuum’s map in Home Assistant. [Beta 8](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.8) adds saved cleaning routines, clearer live status, and lamps and LED strips that mirror real lights on the Ecovacs T90 and Roborock Qrevo maps. The screenshots use fictional homes.
 
-All five beta downloads include guided setup and a local test report. Choose the module for your Home Assistant integration below.
+All five downloads include guided setup and a local test report. The four companion modules are the tested beta 7 builds and still report their own beta 7 version. Choose the module for your Home Assistant integration below.
 
 ![Roborock preview with a white Qrevo beside the controls and on a furnished fictional floor](docs/roborock-qrevo.png)
 
@@ -14,7 +14,7 @@ All five beta downloads include guided setup and a local test report. Choose the
 
 ## Which download fits your robot?
 
-| Robot or integration | Download from the beta 7 release | What you need |
+| Robot or integration | Download from the beta 8 release | What you need |
 | --- | --- | --- |
 | Ecovacs T90, Roborock Qrevo | `t90-map-card.js` | Official integration and the vacuum’s map image. Both have 3D layout recovery and compact phone controls. |
 | Dreame L40s Pro Ultra | `dreame-map-card-beta.js` | Tasshack’s Dreame Vacuum integration with the current floor map camera. [Dreame guide](https://github.com/gdelagardelle/t90-map-card/blob/ded6ba7d724f1930810cfd0e3bb81e2b92aae5e1/docs/dreame.md) |
@@ -22,7 +22,7 @@ All five beta downloads include guided setup and a local test report. Choose the
 | Roomba/Braava, Shark IQ, Xiaomi Mi Robot, Matter vacuum | `vacuum-controls-card.js` | The corresponding HA integration and a vacuum entity. An optional image or camera provides a map. A compatible Roomba+ Rooms Map can provide 3D room outlines. [Controls guide](https://github.com/gdelagardelle/t90-map-card/blob/ded6ba7d724f1930810cfd0e3bb81e2b92aae5e1/testers/vacuum-controls/START-HERE.md) |
 | Robot already running Valetudo | `valetudo-map-card.js` | MQTT discovery and the robot’s Map data camera. This tester displays the native map. [Valetudo guide](https://github.com/gdelagardelle/t90-map-card/blob/ded6ba7d724f1930810cfd0e3bb81e2b92aae5e1/testers/valetudo/README.md) |
 
-Get your JavaScript module from the [beta 7 release assets](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.7). When updating a manual installation, replace the same file, change the existing resource URL’s version query to `?v=beta7`, and reload the dashboard.
+Get your JavaScript module from the [beta 8 release assets](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.8). When updating a manual installation, replace the same file, change the existing resource URL’s version query to `?v=beta8`, and reload the dashboard.
 
 ## Before installing
 
@@ -34,13 +34,34 @@ Get your JavaScript module from the [beta 7 release assets](https://github.com/g
 ## Install with HACS
 
 1. Open **HACS → ⋮ → Custom repositories**. Paste `https://github.com/gdelagardelle/t90-map-card` and choose **Dashboard** as the type.
-2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For guided setup, layout recovery and the phone controls, open **Need a different version?** and select **v0.3.0-beta.7**. Reload your dashboard after installation.
+2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For routines, live status and linked lighting, open **Need a different version?** and select **v0.3.0-beta.8**. Reload your dashboard after installation.
 3. Edit your dashboard and choose **Add card → T90 3D Map**. Pick your vacuum. The editor suggests its integration and selects the map when it finds exactly one available image on the same device. If there are several, choose the floor you recognize in the preview. When Home Assistant omits device information, select the format and image manually.
 4. Check the preview and the detected features, then save the card. An unconfirmed feature means the editor could not verify it with the current data. For a missing map, open **Settings → Devices & services**, open the vacuum’s device, and enable its map image. The companion editors have their own source requirements. SwitchBot and Vacuum Controls also work without a map.
 
 ### Sharing a beta test report
 
 On the dashboard, open **Test details**, review the preview and choose **Copy test details**. The report is generated in your browser. It contains the card version, reported integration and recognized model, detected features, and the latest command result from this card session. A command accepted by Home Assistant may still be waiting for the robot. Unrecognized model fields are omitted or marked unconfirmed. Maps, coordinates, room names, entity IDs, URLs and raw error messages are excluded. On a local HTTP dashboard, the text is selectable even if the browser blocks clipboard access.
+
+### Save a cleaning routine
+
+1. To save a repeat clean, open **Cleaning routines → New routine** on the T90 or Qrevo card. Give it a name, such as **After dinner**. Choose specific rooms or explicitly choose **Whole home**.
+2. Pick the suction, mop or cleaning settings you want to apply. **Leave unchanged** keeps the robot’s current value. Options come from the selected device. **Save routine** stores it on this dashboard for the current vacuum and floor.
+3. Choose the saved routine and **Review**. The card highlights matched rooms on the 3D map. Check the target and settings, then use **Start routine** when you want the robot to run. The card checks the current floor and waits for Home Assistant to confirm changed settings before sending Start. If a setting fails, check the message for any settings already applied.
+4. Use **Edit** to rename a routine or change its rooms and settings. After a remap or a room rename, review and match the target again. **Remove** deletes a routine after confirmation.
+
+Saving routines requires a storage dashboard you can edit. Each routine belongs to one vacuum and floor. A routine does not create a schedule or run in the background.
+
+### Read the live status
+
+The status beside the robot (above the target on a compact phone bar) distinguishes a command being sent from the robot reporting **Cleaning**, **Paused** or **Returning home**. **Washing mop** appears when the station reports it. If a moving robot’s displayed map is at least two minutes old, a small label shows its age beside the last reported position or in the map corner if there is no recognizable marker. Reopening the card or polling the same image preserves the age supplied by Home Assistant.
+
+### Link a floor lamp or LED strip
+
+Open **Edit furnishings**, place or select a **Floor lamp** or **LED strip**, then open **Link light** and choose its **Home Assistant light**. Search by name or entity ID. The 3D light mirrors on/off, brightness and the color reported by the light. Unavailable lights appear unlit. **Unlinked** returns a furnishing to the decorative daylight/night lighting. Save the edited layout to the dashboard to use the same links on other devices. Linking only displays a real light’s state. Use your normal Home Assistant light controls to operate it. An exported layout with linked fixtures contains their light entity IDs.
+
+![Warm floor lamp beside the sofa and cool LED strip along the kitchen cabinets in a fictional home at night](docs/linked-lights-night.png)
+
+[View the same lights in daylight](docs/linked-lights-daylight.png)
 
 ### Phone controls
 
@@ -52,7 +73,7 @@ This repository can be added directly to HACS. [HACS custom repository instructi
 
 ## Manual install
 
-1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.7/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
+1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.8/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
 2. In **Settings → Dashboards → ⋮ → Resources**, add `/local/t90-map-card.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. Reload the page.
 3. Use the visual editor or add a manual card with your own entity IDs.
 
@@ -128,7 +149,7 @@ The glowing marker follows the latest reported position. The card checks the map
 
 Both map sources share the furniture palette. Select a piece and choose **Keep proportions** to resize uniformly, or **Free stretch** to change width and depth independently. Drag a corner on the map or open **Resize** for separate sliders. Widening a TV board or desk keeps its screen at its original size. Narrowing the base sufficiently also reduces the screen, keeping its aspect ratio.
 
-Kitchen & dining includes square and rectangular dining tables and a long trestle table. Bedroom includes single-door, double-door and wide sliding closets. Browse by room for a bedside table, shoe cabinet, round side table, dining chair, oven and hob, and coat rack. It includes an armchair, ottoman, bookcase, dresser, media console, entry bench, retro refrigerator and dishwasher. A finish applies to the selected piece and is saved with its layout. The palette also includes an **office desk** with a monitor, a separate **office chair**, a **potted plant**, a **floor lamp**, and an **LED strip**. Choose **Free stretch** to stretch the strip lengthwise. The strip glows along its full length, including the ends. The floor lamp casts a softer circular pool. Both effects are stronger in Night. They are visual furnishings and do not send commands to a physical light.
+Kitchen & dining includes square and rectangular dining tables and a long trestle table. Bedroom includes single-door, double-door and wide sliding closets. Browse by room for a bedside table, shoe cabinet, round side table, dining chair, oven and hob, and coat rack. It includes an armchair, ottoman, bookcase, dresser, media console, entry bench, retro refrigerator and dishwasher. A finish applies to the selected piece and is saved with its layout. The palette also includes an **office desk** with a monitor, a separate **office chair**, a **potted plant**, a **floor lamp**, and an **LED strip**. Choose **Free stretch** to stretch the strip lengthwise. The strip glows along its full length, including the ends. The floor lamp casts a softer circular pool. Both effects are stronger in Night. Both can optionally mirror a Home Assistant light. See the linking steps above.
 
 Lengths use the map’s coordinate system. Physical calibration is deferred. Edits customize the dashboard drawing. The robot continues to navigate with its Ecovacs map. New installations start with an unfurnished floor.
 

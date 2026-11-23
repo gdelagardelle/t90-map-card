@@ -1,3 +1,4 @@
+import { mapAgePin } from './map-age-pin.js';
 import { routeLight, lightWave, ROUTE_SWEEP_MS } from './route-light.js';
 import { setupRoomPicking } from './ecovacs-room-picking.js';
 import * as THREE from 'three';
@@ -329,11 +330,15 @@ function renderPreview() {
   const robot = positionOf('#d');
   const dockLabel = dock ? new THREE.Vector3(dock.x - centerX, 10, dock.y - centerZ) : null;
   const projected = new THREE.Vector3();
+  let mapRobot;
+  const projectAge=mapAgePin(viewer,()=>mapRobot?.visible && !viewer.classList.contains('show-source')
+    ? mapRobot.getWorldPosition(projected).project(camera) : null);
   let rooms;
   let refreshWallHandles = () => {};
   let refreshFurnitureHandles = () => {};
   function draw() {
     renderer.render(scene, camera);
+    projectAge();
     rooms?.refreshPins();
     refreshWallHandles();
     refreshFurnitureHandles();
@@ -694,7 +699,7 @@ function renderPreview() {
     model.add(accent);
   }
 
-  const vacuum = makeRobot();
+  const vacuum = mapRobot = makeRobot();
   model.add(vacuum);
   vacuum.visible = Boolean(robot);
   if (robot) {
@@ -997,11 +1002,13 @@ function renderPreview() {
   function updateStatus() {
     if (!lastSample) return;
     const fresh = Date.now() - lastSample.received < 25000;
-    const stamp = new Date(lastSample.mapTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    feedLabel.textContent = fresh ? 'Live tracking' : 'Tracking paused';
+    const stamp = Date.parse(lastSample.mapTime);
+    const ageLabel=viewer.querySelector('.map-age-pin');
+    feedLabel.textContent = ageLabel && !ageLabel.hidden ? 'Last known map' : fresh ? 'Live tracking' : 'Tracking paused';
     const state = lastSample.state.replaceAll('_', ' ');
     status.textContent = (fresh ? state[0].toUpperCase() + state.slice(1) : 'Last known position') +
-      ' · Map ' + stamp + (lastSample.xy ? '' : ' · Position unavailable');
+      (Number.isFinite(stamp) ? ' · Map '+new Date(stamp).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) : '') +
+      (lastSample.xy ? '' : ' · Position unavailable');
     viewer.dataset.tracking = fresh ? 'live' : 'paused';
   }
   window.deebotTrackingUpdate = sample => {
