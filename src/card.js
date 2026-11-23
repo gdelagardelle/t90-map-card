@@ -37,6 +37,7 @@ class T90MapCard extends HTMLElement {
             config.map_entity && !/^image\.[a-z0-9_]+$/.test(config.map_entity)) throw Error('Invalid vacuum or map entity ID.');
       }
       this.generation++;
+      this.cancelStartWatch();
       this.abort?.abort();
       this.config = null;
       this.ui = null;
@@ -63,6 +64,10 @@ class T90MapCard extends HTMLElement {
     }
     this.roborock = roborock;
     if (!this.ui) { this.rrFloor = null; this.rrBlob = this.rrDisplayed = null; this.rrReadAt = 0; this.mapReady=false; }
+    if (changed || !this.ui) {
+      this.cancelStartWatch();
+      this.needsTargetChoice = false;
+    }
     this.config = config;
     this.vacuum = config.entity;
     this.image = config.map_entity;
@@ -88,6 +93,8 @@ class T90MapCard extends HTMLElement {
     if (this.ui && this.h) this.refresh();
   }
   disconnectedCallback() {
+    this.cancelStartWatch();
+    if (this.ui && !this.roborock) this.commandStatus('');
     clearInterval(this.timer); this.timer = null;
     this.subscription?.then(fn => fn?.()).catch(()=>{});
     this.subscription = null;
@@ -105,15 +112,15 @@ class T90MapCard extends HTMLElement {
   build() {
     this.shadowRoot.innerHTML = `<style>${palette}
 ${cardStyles}</style>
-    <ha-card><div class="cockpit"><div class="appearance"><span>Map appearance</span>
+    <ha-card><div class="cockpit"><div class="appearance"><span class="card-heading">Map appearance</span>
     <div class="picker" role="group" aria-label="Map appearance"><button type="button" data-look="daylight">Daylight</button><button type="button" data-look="night">Night</button></div></div>
     <div class="map-row"><iframe title="Live 3D Deebot map"></iframe>
     <aside class="robot-panel" aria-label="Deebot controls"><img alt="Deebot T90 robot preview" hidden>
     <div class="identity"><h2>Deebot T90</h2><span class="vitals"></span></div>
     <div class="targetbox"><span class="target-label">Cleaning target</span><p class="target" aria-live="polite">Whole home</p></div>
-    <div class="actions main-actions"></div></aside></div></div><section class="panel">
+    <div class="actions main-actions"></div><p class="command-status" role="status" aria-live="polite"></p></aside></div></div><section class="panel">
     <details class="rooms"><summary>Choose rooms · Whole home</summary><div class="content"><div class="chips"></div><button class="reassign" type="button">Change a map room name</button></div></details>
-    <details open><summary>Cleaning settings</summary><div class="content settings"></div></details>
+    <details class="cleaning-settings" open><summary>Cleaning settings</summary><div class="content settings"></div></details>
     <details><summary>Dock and maintenance</summary><div class="content"><div class="actions station"></div><div class="readings"></div></div></details>
     <div class="alerts" aria-live="polite"></div><details class="history"><summary>Recent alerts and cleaning jobs</summary><div class="content fault-history"></div></details>
     <details><summary>Room layout</summary><div class="content"><label>Import your edited map <input type="file" accept="application/json,.json"></label><button class="export-layout">Export layout file</button><button class="save-layout">Save this layout to the dashboard</button></div></details>
@@ -147,6 +154,12 @@ ${cardStyles}</style>
       this.q('.reassign').hidden=true;
       this.q('.save-layout').closest('details').hidden=true;
     }
+    if (!this.roborock) {
+      const cockpit = this.q('.cockpit');
+      cockpit.classList.add('deebot');
+      this.q('.card-heading').textContent = 'Vacuum map';
+      this.q('.cleaning-settings').open = false;
+    }
     this.note('Waiting for the map image…');
     const dialog=this.q('dialog'), chooser=dialog.querySelector('select');
     chooser.onchange=()=>{this.q('.bind').disabled = chooser.value==='';};
@@ -158,6 +171,16 @@ ${cardStyles}</style>
     for (const [service,label] of [['start','Start'],['pause','Pause'],['stop','Stop'],['return_to_base','Go home']]) {
       const button = element('button',label,service === 'start' ? 'primary' : '');
       button.dataset.action = service;
+      if (!this.roborock) {
+        const icon = document.createElementNS('http://www.w3.org/2000/svg','svg');
+        const glyph = document.createElementNS(icon.namespaceURI,'path');
+        const glyphs = {start:'m8 4 12 8-12 8z',pause:'M8 5v14M16 5v14',stop:'M5 5h14v14H5z',return_to_base:'m2 11 10-8 10 8M5 10v11h14V10'};
+        glyph.setAttribute('d',glyphs[service]);
+        icon.setAttribute('viewBox','0 0 24 24');
+        icon.setAttribute('aria-hidden','true');
+        icon.append(glyph);
+        button.replaceChildren(icon,element('span',label,'action-label'));
+      }
       button.onclick = () => this.control(service);
       this.q('.main-actions').append(button);
     }
@@ -188,9 +211,12 @@ ${cardStyles}</style>
   activateMap(map) {
     const scope = 't90:' + this.vacuum + ':' + this.image + ':' + map.geometryId;
     if (scope === this.scope) return;
+    if (this.scope && this.selectedRooms.size) {
+      this.selectedRooms.clear();
+      this.needsTargetChoice = true;
+    }
     this.scope = scope;
     this.layoutKeys = [scope + ':furniture', scope + ':walls'];
-    this.selectedRooms.clear();
     this.pendingRegion = null;
     this.q('dialog').close();
     this.frame.t90Map = { scan: map.svg, scope, appearance: this.dataset.appearance,
@@ -241,6 +267,87 @@ ${cardStyles}</style>
     this.note('Layout saved for this dashboard.');
   }
   note(message) { this.q('.note').textContent = message; }
+  commandStatus(message, level = '') {
+    const area = this.q('.command-status');
+    area.dataset.level = level;
+    if (area.textContent !== message) area.textContent = message;
+  }
+  cancelStartWatch() {
+    clearTimeout(this.startTimer);
+    this.startRequest = null;
+  }
+  ecovacsStartProblem() {
+    const vacuum = this.h.states[this.vacuum];
+    if (!this.isConnected || this.h.connected === false || !known(vacuum?.state)) return 'Waiting for the Deebot to reconnect.';
+    if (vacuum.state === 'paused') return '';
+    if (this.needsTargetChoice) return 'The floor changed. Choose a room or Whole home before starting.';
+    if (!this.selectedRooms.size) return '';
+    const registry = this.h.entities;
+    const device = registry?.[this.vacuum]?.device_id;
+    const mapDevice = registry?.[this.image]?.device_id;
+    if (device && mapDevice && device !== mapDevice) return 'Choose the map image that belongs to this Deebot.';
+    if (!this.mapReady || this.mapStamp !== this.h.states[this.image]?.state) return 'Waiting for the current map to start the selected rooms.';
+    if ([...this.selectedRooms].some(id => !this.roomLabels?.has(id))) return 'A selected room is unavailable. Choose Whole home or wait for the room list.';
+    return '';
+  }
+  usesT90MaxCleanV2() {
+    const entity = this.h.entities?.[this.vacuum];
+    return entity?.platform === 'ecovacs' && this.h.devices?.[entity.device_id]?.model_id === 'b7vftn';
+  }
+  async startEcovacs() {
+    if (this.busy || this.startRequest) return;
+    const problem = this.ecovacsStartProblem();
+    if (problem) { this.commandStatus(problem, 'error'); return; }
+    const vacuum = this.h.states[this.vacuum];
+    if (vacuum.state === 'cleaning') return;
+    const rooms = [...this.selectedRooms];
+    const roomClean = rooms.length > 0 && vacuum.state !== 'paused';
+    const action = vacuum.state === 'paused' ? 'Resume' : 'Start';
+    const target = roomClean ? rooms.map(id => this.roomLabels.get(id)).join(', ') : 'Whole home';
+    const description = vacuum.state === 'paused' ? 'the paused job' : target;
+    const cleanV2 = this.usesT90MaxCleanV2();
+    const request = {};
+    const epoch = this.generation;
+    this.startRequest = request;
+    this.commandStatus(action + ' requested · ' + description, 'pending');
+    try {
+      this.refresh();
+      let service = 'start', data = {};
+      if (cleanV2) {
+        // This model rejects the legacy "clean" command in the Ecovacs profile.
+        const params = vacuum.state === 'paused' ? {act:'resume'} : {act:'start',content:roomClean ?
+          {type:'freeClean',value:rooms.map(id => '1,' + id).join(';')} : {type:'auto'}};
+        service = 'send_command';
+        data = {command:'clean_V2', params};
+      } else if (roomClean) {
+        service = 'send_command';
+        data = {command:'spot_area',params:{rooms,cleanings:Number(this.h.states[this.id('number','clean_count')]?.state)||1}};
+      }
+      await this.h.callService('vacuum', service, data, {entity_id:this.vacuum});
+      if (this.startRequest !== request) return;
+      this.commandStatus('Waiting for the Deebot to report cleaning…', 'pending');
+      const finishWaiting = () => {
+        if (this.startRequest !== request) return;
+        this.cancelStartWatch();
+        this.commandStatus('Home Assistant accepted ' + action + ', but the Deebot hasn’t reported cleaning. Check its status in Ecovacs Home.', 'error');
+        this.refresh();
+      };
+      this.startTimer = setTimeout(() => {
+        // Allow a station's reported mop wash to finish before treating a docked robot as unconfirmed.
+        if (cleanV2 && this.h.states[this.id('sensor','station_state')]?.state === 'washing_mop') {
+          this.startTimer = setTimeout(finishWaiting, 210000);
+        } else finishWaiting();
+      }, 30000);
+    } catch (err) {
+      if (this.startRequest === request) {
+        this.cancelStartWatch();
+        const detail = err?.message || err?.error?.message || (typeof err === 'string' ? err : 'Home Assistant rejected the request.');
+        this.commandStatus(action + ' failed · ' + detail, 'error');
+      }
+    } finally {
+      if (epoch === this.generation) this.refresh();
+    }
+  }
   async send(domain, service, entity, data = {}) {
     if (this.busy || !entity) return;
     this.busy = true; this.refresh();
@@ -251,13 +358,20 @@ ${cardStyles}</style>
     finally { this.busy = false; this.refresh(); }
   }
   control(action) {
+    if (!this.roborock) {
+      if (action === 'start') return this.startEcovacs();
+      this.cancelStartWatch();
+      this.commandStatus('');
+      if (this.usesT90MaxCleanV2() && (action === 'pause' || action === 'stop')) {
+        return this.send('vacuum','send_command',this.vacuum,{command:'clean_V2',params:{act:action}});
+      }
+    }
     if (action === 'start' && this.selectedRooms.size && !this.mapReady && this.h.states[this.vacuum]?.state !== 'paused') {
       this.note('Wait for the current map before starting a room clean.');
       return;
     }
     if (action === 'start' && this.selectedRooms.size && this.h.states[this.vacuum]?.state !== 'paused') {
-      if (this.roborock) return this.cleanRoborockRooms();
-      return this.send('vacuum','send_command',this.vacuum,{command:'spot_area',params:{rooms:[...this.selectedRooms],cleanings:Number(this.h.states[this.id('number','clean_count')]?.state)||1}});
+      return this.cleanRoborockRooms();
     }
     return this.send('vacuum',action,this.vacuum);
   }
@@ -268,7 +382,6 @@ ${cardStyles}</style>
     this.roomsKey = signature;
     this.roomLabels = new Map();
     const list = this.q('.chips'); list.replaceChildren();
-    const valid = new Set();
     const chip = (label, value) => {
       const b = element('button',label);
       b._room = value;
@@ -285,12 +398,14 @@ ${cardStyles}</style>
     }
     for (const [name,ids] of Object.entries(rooms)) for (const value of [].concat(ids)) {
       if (!Number.isInteger(value)) continue;
-      valid.add(value);
       chip((title(name) || 'Room') + (!name || Array.isArray(ids) ? ' '+value : ''), value);
     }
-    this.selectedRooms = new Set([...this.selectedRooms].filter(v=>valid.has(v)));
   }
   toggleRoom(value) {
+    if (!this.roborock && (value == null || this.roomLabels?.has(value))) {
+      this.needsTargetChoice = false;
+      if (!this.startRequest) this.commandStatus('');
+    }
     if (value == null) this.selectedRooms.clear();
     else if (!this.roomLabels?.has(value)) return;
     else if (this.roborock && this.selectedRooms.size && !this.sameRoborockFloor()) {
@@ -322,7 +437,8 @@ ${cardStyles}</style>
     if (!setRooms) return;
     const regions=(this.livePaths || []).map(path=>{
       const id=this.config.maps?.[this.scope]?.room_bindings?.[path];
-      return {path,id:this.roomLabels?.has(id) ? id : null};
+      const name=this.roomLabels?.get(id);
+      return {path,id:name ? id : null,name:name || null};
     });
     setRooms(regions,[...this.selectedRooms],this.pendingRegion,path=>{
       const region=regions.find(r=>r.path===path);
@@ -390,19 +506,55 @@ ${cardStyles}</style>
     const h = this.h;
     if (!this.config || !this.ui || !h || !this.isConnected) return;
     const v = h.states[this.vacuum], active = known(v?.state);
-    this.q('.robot-panel h2').textContent = v?.attributes.friendly_name || (this.roborock ? 'Roborock' : 'Deebot T90');
+    this.q('.identity h2').textContent = v?.attributes.friendly_name || (this.roborock ? 'Roborock' : 'Deebot T90');
     this.renderRooms(v);
     const count = this.selectedRooms.size;
+    const startProblem = this.roborock ? '' : this.ecovacsStartProblem();
+    if (!this.roborock) {
+      const status = this.q('.command-status');
+      if (this.startRequest && v?.state === 'cleaning') {
+        this.cancelStartWatch();
+        this.commandStatus('Deebot reports cleaning.', 'ok');
+      } else if (this.startRequest && v?.state === 'error') {
+        this.cancelStartWatch();
+        this.commandStatus('The Deebot reported an error. Check the robot and its station.', 'error');
+      } else if (this.startRequest && this.usesT90MaxCleanV2() &&
+                 h.states[this.id('sensor','station_state')]?.state === 'washing_mop') {
+        this.commandStatus('The station is washing the mop. Waiting for the Deebot to leave the dock…', 'pending');
+      } else if (!this.startRequest && startProblem) {
+        this.commandStatus(startProblem, 'blocked');
+      } else if (!startProblem && status.dataset.level === 'blocked') this.commandStatus('');
+    }
     for (const b of this.q('.chips').children) b.setAttribute('aria-pressed',String(b._room == null ? count === 0 : this.selectedRooms.has(b._room)));
     this.q('.rooms summary').textContent = 'Choose rooms · ' + (count ? count+' selected' : 'Whole home');
     this.q('.reassign').setAttribute('aria-pressed',String(!!this.renaming));
-    this.q('.target').textContent = this.roborock && !count && !this.rrFloor ? 'Whole home' : this.renaming ? 'Tap the room to rename' : count ? [...this.selectedRooms].map(id=>(this.roomLabels.get(id) || 'Room '+id)).join(' · ') : 'Whole home · Tap rooms on the map';
+    this.q('.target').textContent = this.roborock && !count && !this.rrFloor ? 'Whole home' : this.renaming ? 'Tap the room to rename' : count ? [...this.selectedRooms].map(id=>(this.roomLabels.get(id) || 'Room '+id)).join(' · ') : (this.roborock ? 'Whole home · Tap rooms on the map' : 'Whole home');
     this.syncMapRooms();
     for (const b of this.q('.main-actions').children) {
       const a = b.dataset.action;
       b.disabled = !active || this.busy || (a === 'start' && v.state === 'cleaning') || (a === 'pause' && v.state !== 'cleaning');
+      if (a === 'start' && (startProblem || this.startRequest)) b.disabled = true;
       if (a === 'start' && count && (!this.mapReady || (this.roborock && !this.sameRoborockFloor())) && v?.state !== 'paused') b.disabled = true;
-      if (a === 'start') b.textContent = v?.state === 'paused' ? 'Resume' : 'Start · ' + (count ? [...this.selectedRooms].map(room => (this.roomLabels.get(room) || 'Room '+room)).join(' + ') : 'Whole home');
+      if (a === 'start') {
+        const paused = v?.state === 'paused';
+        const target = count ? [...this.selectedRooms].map(id=>this.roomLabels.get(id) || 'Room '+id).join(' + ') : 'Whole home';
+        const name = paused ? 'Resume' : 'Start · ' + target;
+        if (this.roborock) b.textContent = name;
+        else {
+          b.setAttribute('aria-label',name);
+          b.title = name;
+          const label = b.querySelector('.action-label');
+          if (label.textContent !== name) {
+            label.replaceChildren(paused ? 'Resume' : 'Start');
+            if (!paused) label.append(element('span',' · '+target,'action-target'));
+          }
+        }
+      }
+      if (!this.roborock) {
+        const cleaning = v?.state === 'cleaning';
+        b.hidden = a === 'start' && cleaning || a === 'pause' && !cleaning;
+        b.classList.toggle('primary',a === (cleaning ? 'pause' : 'start'));
+      }
     }
     const bat = h.states[this.id('sensor','battery')]?.state ?? v?.attributes.battery_level;
     this.q('.vitals').textContent = [statesText(v?.state),known(bat) && bat+'% battery'].filter(Boolean).join(' · ');

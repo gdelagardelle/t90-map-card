@@ -1,4 +1,4 @@
-import { routeLight,lightWave } from './route-light.js';
+import { routeLight, lightWave, ROUTE_SWEEP_MS } from './route-light.js';
 import { setupRoomPicking } from './ecovacs-room-picking.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -20,7 +20,50 @@ window.t90SetAppearance(window.frameElement.t90Map.appearance);
 const viewer = document.querySelector('.viewer');
 const notice = document.querySelector('.notice');
 const compare = new Image();
-const cameraButtons = [...document.querySelectorAll('[data-camera]')];
+document.documentElement.classList.add('deebot-scene');
+const cameraNav = document.querySelector('nav[aria-label="Camera views"]');
+const cameraSelect = document.createElement('select');
+cameraSelect.className = 'camera-select';
+cameraSelect.setAttribute('aria-label', 'Camera view');
+for (const button of cameraNav.querySelectorAll('[data-camera]')) {
+  const option = new Option(button.textContent, button.dataset.camera);
+  option.hidden = button.hidden;
+  cameraSelect.add(option);
+}
+cameraNav.replaceChildren(cameraSelect);
+
+const tools = document.querySelector('.tools');
+const layers = makeMenu('Layers', ['[data-view="route"]', '[data-furnishing="visible"]', '[data-view="source"]']);
+const editMenu = makeMenu('Edit map', ['[data-furnishing="edit"]', '[data-wall="edit"]', '#layout-lock']);
+editMenu.className = 'edit-menu';
+cameraNav.after(tools);
+function makeMenu(label, selectors) {
+  const menu = document.createElement('details');
+  const trigger = document.createElement('summary');
+  trigger.textContent = label;
+  const list = document.createElement('div');
+  list.className = 'tool-list';
+  list.append(...selectors.map(selector => tools.querySelector(selector)));
+  menu.append(trigger, list);
+  tools.append(menu);
+  return menu;
+}
+function closeMenus(event) {
+  for (const menu of [editMenu, layers]) {
+    if (menu.open && !menu.contains(event.target)) menu.open = false;
+  }
+}
+document.addEventListener('pointerdown', closeMenus);
+document.addEventListener('focusin', closeMenus);
+window.addEventListener('blur', () => { editMenu.open = layers.open = false; });
+tools.addEventListener('keydown', event => {
+  const menu = event.target.closest('details[open]');
+  if (event.key === 'Escape' && menu) {
+    menu.open = false;
+    menu.querySelector('summary').focus();
+    event.preventDefault();
+  }
+});
 const dockPin = document.querySelector('.dock-pin');
 const sourceButton = document.querySelector('[data-view="source"]');
 const routeButton = document.querySelector('[data-view="route"]');
@@ -286,10 +329,12 @@ function renderPreview() {
   const robot = positionOf('#d');
   const dockLabel = dock ? new THREE.Vector3(dock.x - centerX, 10, dock.y - centerZ) : null;
   const projected = new THREE.Vector3();
+  let rooms;
   let refreshWallHandles = () => {};
   let refreshFurnitureHandles = () => {};
   function draw() {
     renderer.render(scene, camera);
+    rooms?.refreshPins();
     refreshWallHandles();
     refreshFurnitureHandles();
     if (!dockLabel || viewer.classList.contains('show-source') || viewer.parentElement.dataset.editing === 'true') {
@@ -301,6 +346,18 @@ function renderPreview() {
     const y = (1 - projected.y) * viewer.clientHeight / 2;
     dockPin.hidden = x < 12 || x > viewer.clientWidth - 73 || y < 23 || y > viewer.clientHeight - 23;
     dockPin.style.transform = `translate(${x + 13}px, ${y}px) translateY(-50%)`;
+    // The physical dock remains in the scene when its label would cover a room.
+    if (!dockPin.hidden) {
+      const dockRect = dockPin.getBoundingClientRect();
+      for (const pin of viewer.querySelectorAll('.room-pin:not([hidden])')) {
+        const room = pin.getBoundingClientRect();
+        if (dockRect.left < room.right + 4 && dockRect.right > room.left - 4 &&
+            dockRect.top < room.bottom + 4 && dockRect.bottom > room.top - 4) {
+          dockPin.hidden = true;
+          break;
+        }
+      }
+    }
   }
   orbit.addEventListener('change', draw);
 
@@ -476,7 +533,51 @@ function renderPreview() {
   const routeHalo = new THREE.MeshBasicMaterial({
     color: 0xe8944d, opacity: 0.24, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide,
   });
-  const pulse=routeLight(viewer,()=>renderer.render(scene,camera));
+  const travelSegments = [];
+  const headMaterial = new THREE.ShaderMaterial({
+    transparent:true, depthWrite:false, toneMapped:false,
+    uniforms:{strength:{value:0}},
+    vertexShader:`varying vec2 spot;
+      void main(){spot=(uv-.5)*2.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`varying vec2 spot;uniform float strength;
+      void main(){
+        float radius=length(spot);
+        float core=exp(-18.*radius*radius);
+        float halo=1.-smoothstep(.18,1.,radius);
+        gl_FragColor=vec4(mix(vec3(.015,.65,.66),vec3(.94,1.,1.),core),
+          strength*(.56*halo+.44*core));
+        #include <colorspace_fragment>
+      }`
+  });
+  const head = new THREE.Mesh(new THREE.PlaneGeometry(2,2),headMaterial);
+  head.rotation.x = -Math.PI/2;
+  head.renderOrder = 3;
+  head.visible = false;
+  model.add(head);
+  const pulse=routeLight(viewer,() => {
+    const position = pulse.phase.value * 1.27 - .035;
+    head.visible = pulse.phase.value >= 0 && travelSegments.length > 0;
+    if (head.visible) {
+      const distance = THREE.MathUtils.clamp(position,0,1) * totalLength.value;
+      let lo=0, hi=travelSegments.length-1;
+      while (lo < hi) {
+        const mid = (lo+hi) >>> 1;
+        if (travelSegments[mid].end < distance) lo=mid+1;
+        else hi=mid;
+      }
+      const {a,b,start,end}=travelSegments[lo];
+      const t=THREE.MathUtils.clamp((distance-start)/(end-start),0,1);
+      head.position.set(THREE.MathUtils.lerp(a.x,b.x,t),.48,THREE.MathUtils.lerp(a.y,b.y,t));
+      // Even the first movement can be shorter than the vacuum's diameter.
+      // Let the light spill onto the visible floor beyond its bumper.
+      const unitsPerPixel=(camera.top-camera.bottom)/(camera.zoom*Math.max(1,viewer.clientHeight));
+      const radius=THREE.MathUtils.clamp(10*unitsPerPixel,6.7,13);
+      head.scale.set(radius,radius,1);
+      headMaterial.uniforms.strength.value=THREE.MathUtils.smoothstep(position,-.035,.035)*
+        (1-THREE.MathUtils.smoothstep(position,1,1.20));
+    }
+    renderer.render(scene,camera);
+  });
   const totalLength={value:0};
   const luminous=new THREE.ShaderMaterial({
     transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false,
@@ -485,18 +586,51 @@ function renderPreview() {
       void main(){along=travel;across=uv.y*2.-1.;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
     fragmentShader:`uniform float phase,total;varying float along,across;`+lightWave+`
       void main(){
-        float core=exp(-abs(across)*7.);
-        float wave=routeWave(along/max(total,.001),phase)*(.23+.77*min(1.,total/140.));
-        gl_FragColor=vec4(mix(vec3(.08,.88,.87),vec3(.88,1.,1.),core),wave*(.54+.46*core)*(1.-across*across));
+        float core=exp(-across*across*12.);
+        float wave=routeWave(along/max(total,.001),phase)*(.76+.24*min(1.,total/140.));
+        gl_FragColor=vec4(mix(vec3(.01,.68,.72),vec3(.96,1.,1.),core),wave*(.78+.22*core)*(1.-smoothstep(.38,1.,abs(across))));
         #include <colorspace_fragment>
       }`
   });
   let lastSample;
   let traceSegments = 0;
-  function syncPulse(){
-    pulse.enable(!!(lastSample?.state==='cleaning' && route.visible && traceSegments &&
-      !viewer.classList.contains('show-source') && viewer.parentElement.dataset.editing!=='true'));
+  const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
+  motionPreference.addEventListener('change', syncPulse);
+  const replay = document.createElement('button');
+  replay.type = 'button';
+  replay.textContent = 'Replay path';
+  replay.setAttribute('aria-pressed','false');
+  layers.querySelector('.tool-list').append(replay);
+  let replayTimer = null;
+  function finishReplay() {
+    clearTimeout(replayTimer);
+    replayTimer = null;
+    syncPulse();
   }
+  function syncPulse() {
+    const cleaning = lastSample?.state === 'cleaning';
+    const visible = route.visible && traceSegments > 0 &&
+      !viewer.classList.contains('show-source') && viewer.parentElement.dataset.editing !== 'true';
+    const canReplay = visible && !cleaning && !motionPreference.matches;
+    if (!canReplay && replayTimer !== null) {
+      clearTimeout(replayTimer);
+      replayTimer = null;
+    }
+    replay.disabled = !canReplay;
+    replay.title = motionPreference.matches ? 'Motion is reduced in your device settings' :
+      cleaning ? 'The cleaning path is playing live' : 'Play one sweep of the recorded route';
+    replay.setAttribute('aria-pressed', String(replayTimer !== null));
+    pulse.enable(visible && (cleaning || replayTimer !== null));
+  }
+  replay.onclick = () => {
+    if (replayTimer !== null) finishReplay();
+    else {
+      replayTimer = setTimeout(finishReplay, ROUTE_SWEEP_MS);
+      syncPulse();
+    }
+    layers.open = false;
+    layers.querySelector('summary').focus();
+  };
   function replaceRoute(routePath, baselinePath) {
     for (const child of [...route.children]) {
       route.remove(child);
@@ -504,6 +638,7 @@ function renderPreview() {
     }
     traceSegments = 0;
     totalLength.value=0;
+    travelSegments.length=0;
     let matching = Boolean(baselinePath);
     for (const [index, path] of (routePath?.subPaths ?? []).entries()) {
       let points = path.getPoints(1);
@@ -516,11 +651,16 @@ function renderPreview() {
         points = points.slice(Math.max(0, count - 1));
       }
       if (points.length < 2) continue;
-      traceSegments += points.slice(1).filter((point, index) => point.distanceTo(points[index]) >= 0.03).length;
       const distances=[totalLength.value];
-      for(let i=1;i<points.length;i++) distances.push(distances[i-1]+points[i].distanceTo(points[i-1]));
+      for(let i=1;i<points.length;i++) {
+        const a=points[i-1], b=points[i], start=distances[i-1];
+        const length=b.distanceTo(a);
+        distances.push(start+length);
+        if (length>=.03) travelSegments.push({a,b,start,end:start+length});
+      }
+      traceSegments=travelSegments.length;
       totalLength.value=distances.at(-1);
-      for (const [width, material, lift] of [[1.95, routeHalo, 0.24], [0.68, routeMaterial, 0.32], [2.6,luminous,.40]]) {
+      for (const [width, material, lift] of [[1.95, routeHalo, 0.24], [0.68, routeMaterial, 0.32], [4.4,luminous,.40]]) {
         const style = SVGLoader.getStrokeStyle(width, '#ffffff', 'round', 'round');
         const geometry = SVGLoader.pointsToStroke(points, style, 6, 0.03);
         if (!geometry) continue;
@@ -535,6 +675,7 @@ function renderPreview() {
         geometry.rotateX(Math.PI / 2);
         const strip = addMesh(route, geometry, material, 0, lift);
         strip.castShadow = false;
+        if (material===luminous) strip.renderOrder=2;
       }
     }
     viewer.dataset.traceSegments = String(traceSegments);
@@ -592,6 +733,18 @@ function renderPreview() {
     const viewportHeight = viewer.clientHeight;
     const aspect = viewportWidth / viewportHeight;
     const frameHeight = Math.max(height * 1.42, width * 1.15 / aspect);
+    if (viewportWidth < 1 || viewportHeight < 1) return;
+    // Fit the diagonal 3D view to its projected width and height. Keep a
+    // user's zoom relative to that fit when the dashboard column resizes.
+    const floor = cameraViews.floor;
+    const previousFit = floor.zoom;
+    const direction = floor.offset.clone().normalize();
+    const right = new THREE.Vector3().crossVectors(camera.up, direction).normalize();
+    const up = new THREE.Vector3().crossVectors(direction, right);
+    const span = axis => Math.abs(axis.x) * width + Math.abs(axis.z) * height + 24 * Math.abs(axis.y);
+    const neededHeight = Math.max(span(up), span(right) / aspect);
+    floor.zoom = frameHeight / (neededHeight * 1.06);
+    if (viewer.dataset.camera === 'floor') camera.zoom *= floor.zoom / previousFit;
     camera.left = -frameHeight * aspect / 2;
     camera.right = frameHeight * aspect / 2;
     camera.top = frameHeight / 2;
@@ -601,7 +754,6 @@ function renderPreview() {
     draw();
   }
 
-  const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   const focus = dock ? new THREE.Vector3(dock.x - centerX - 10, 0, dock.y - centerZ + 1) : new THREE.Vector3();
   const cameraViews = {
     floor: { offset: new THREE.Vector3(106, 282, 243), target: new THREE.Vector3(0, 1, 0), zoom: 1 },
@@ -627,12 +779,11 @@ function renderPreview() {
   }
 
   function setCamera(name, animate = false) {
+    if (name==='follow' && !lastSample?.xy) name='floor';
     stopCameraMotion();
     const destination = cameraViews[name];
     const end = destination.offset.clone().add(destination.target);
-    for (const button of cameraButtons) {
-      button.setAttribute('aria-pressed', String(button.dataset.camera === name));
-    }
+    cameraSelect.value = name;
     viewer.dataset.camera = name;
     if (!animate || motionPreference.matches) {
       camera.position.copy(end);
@@ -661,9 +812,7 @@ function renderPreview() {
     cameraFrame = requestAnimationFrame(move);
   }
 
-  for (const button of cameraButtons) {
-    button.addEventListener('click', event => setCamera(button.dataset.camera, event.detail > 0));
-  }
+  cameraSelect.onchange = () => setCamera(cameraSelect.value, true);
   dockPin.addEventListener('click', event => setCamera('dock', event.detail > 0));
   orbit.addEventListener('start', stopCameraMotion);
   function settleCamera() {
@@ -683,7 +832,6 @@ function renderPreview() {
 
   const instructions = document.querySelector('#map-help');
   const mapInstructions = instructions.textContent;
-  const cameraNav = cameraButtons[0].closest('nav');
   let viewBeforeEditing = 'floor';
   function renderEdit(relight) {
     if (relight) key.shadow.needsUpdate = true;
@@ -693,8 +841,13 @@ function renderPreview() {
   function useEditView(editing, helpText) {
     orbit.enabled = !editing;
     cameraNav.hidden = editing;
-    for (const button of cameraButtons) {
-      button.disabled = editing || viewer.classList.contains('show-source');
+    cameraSelect.disabled = editing || viewer.classList.contains('show-source');
+    if (editing) {
+      layers.open = editMenu.open = false;
+      tools.hidden = true;
+    } else {
+      tools.hidden = false;
+      editMenu.querySelector('summary').focus();
     }
     if (editing) viewBeforeEditing = viewer.dataset.camera ?? 'floor';
     instructions.textContent = editing ? helpText : mapInstructions;
@@ -808,7 +961,7 @@ function renderPreview() {
   ring.renderOrder = 3;
   ring.castShadow = false;
   beacon.visible = false;
-  const setRoomLighting = setupRoomPicking({
+  rooms = setupRoomPicking({
     canvas: renderer.domElement, camera, floors: selectableFloors, marble, side, viewer, draw
   });
   lightScene = night => {
@@ -829,7 +982,7 @@ function renderPreview() {
     halo.material.color.copy(ring.material.color);
     halo.material.opacity = night ? 0.94 : 0.53;
     furnishings.setLighting(night);
-    setRoomLighting(night);
+    rooms.setLighting(night);
     draw();
   };
   window.t90SetAppearance(window.frameElement.t90Map.appearance);
@@ -858,18 +1011,22 @@ function renderPreview() {
       previousRoute = sample.route;
       previousBaseline = baseline;
     }
+    rooms.setActivePosition(sample.xy,sample.state==='cleaning');
     vacuum.visible = Boolean(sample.xy);
     beacon.visible = true;
-    const followButton = cameraButtons.find(button => button.dataset.camera === 'follow');
+    const followButton = cameraSelect.querySelector('[value=follow]');
     followButton.hidden = !sample.xy;
     if (sample.xy) {
       vacuum.position.set(sample.xy[0], 0, sample.xy[1]);
       const target = cameraViews.follow.target.set(sample.xy[0] - centerX, 0, sample.xy[1] - centerZ);
       if (viewer.dataset.camera === 'follow') {
-        stopCameraMotion();
-        camera.position.add(target.clone().sub(orbit.target));
-        orbit.target.copy(target);
-        orbit.update();
+        if (cameraFrame) {
+          setCamera('follow');
+        } else {
+          camera.position.add(target.clone().sub(orbit.target));
+          orbit.target.copy(target);
+          orbit.update();
+        }
       }
     } else if (viewer.dataset.camera === 'follow') {
       setCamera('floor');
@@ -890,7 +1047,7 @@ function renderPreview() {
     replaceRoute(null);
     feedLabel.textContent = 'Connecting';
     setInterval(updateStatus, 3000);
-  if (!dock) cameraButtons.find(button => button.dataset.camera === 'dock').hidden = true;
+  if (!dock) cameraSelect.querySelector('[value=dock]').hidden = true;
 }
 
 compare.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(scan);
@@ -904,7 +1061,7 @@ sourceButton.addEventListener('click', () => {
   viewer.classList.toggle('show-source', show);
   sourceButton.setAttribute('aria-pressed', String(show));
   sourceButton.textContent = show ? 'Back to 3D' : 'Original scan';
-  for (const button of cameraButtons) button.disabled = show;
+  cameraSelect.disabled = show;
   routeButton.disabled = show;
 });
 
@@ -916,7 +1073,7 @@ try {
   notice.hidden = false;
   compare.hidden = false;
   viewer.classList.add('show-source');
-  for (const button of [...cameraButtons, routeButton, sourceButton, ...document.querySelectorAll('[data-furnishing], [data-wall]')]) {
+  for (const button of [cameraSelect, routeButton, sourceButton, ...document.querySelectorAll('[data-furnishing], [data-wall]')]) {
     button.disabled = true;
   }
 }
