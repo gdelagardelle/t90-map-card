@@ -55,6 +55,24 @@ try {
   assert(await page.locator('[data-action=return_to_base]').isEnabled());
   await page.evaluate(() => {h.states[vacuum].state = 'cleaning'; card.hass = h;});
   assert.match(await status.textContent(), /reports cleaning/);
+  // A newer image is announced before its scan can be downloaded.
+  const statusDuringScan = await page.evaluate(async () => {
+    const notice = card.q('.command-status'), previousFetch = h.fetchWithAuth;
+    let finish;
+    h.fetchWithAuth = (...args) => new Promise(resolve => { finish = () => resolve(previousFetch(...args)); });
+    h.states[image].state = 'next-cleaning-scan';
+    card.hass = h;
+    const pending = notice.textContent;
+    const blocked = card.q('[data-action=start]').disabled;
+    finish();
+    h.fetchWithAuth = previousFetch;
+    return {pending, blocked};
+  });
+  assert.match(statusDuringScan.pending, /reports cleaning/, 'Map refresh must preserve the cleaning acknowledgment');
+  assert.equal(statusDuringScan.blocked, true);
+  await page.waitForFunction(() => card.mapReady && card.mapStamp === 'next-cleaning-scan');
+  assert.match(await status.textContent(), /reports cleaning/);
+
   await page.evaluate(() => {h.states[vacuum].state = 'paused'; card.mapReady = false; card.hass = h;});
   await start.click();
   assert.deepEqual(await page.evaluate(() => calls.at(-1)), ['vacuum','start',{},target]);

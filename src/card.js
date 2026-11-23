@@ -509,7 +509,9 @@ ${cardStyles}</style>
     this.q('.identity h2').textContent = v?.attributes.friendly_name || (this.roborock ? 'Roborock' : 'Deebot T90');
     this.renderRooms(v);
     const count = this.selectedRooms.size;
-    const startProblem = this.roborock ? '' : this.ecovacsStartProblem();
+    // While cleaning, Pause replaces Start. Map updates must not announce
+    // readiness to start another job over the current job’s status.
+    const startProblem = this.roborock || v?.state === 'cleaning' ? '' : this.ecovacsStartProblem();
     if (!this.roborock) {
       const status = this.q('.command-status');
       if (this.startRequest && v?.state === 'cleaning') {
