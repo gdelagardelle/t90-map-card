@@ -105,4 +105,6 @@ Set `CHROME_BIN` to use an installed Chromium or Chrome executable. Run `node te
 
 When reporting an issue, include the card version, Home Assistant version, robot model, browser, and the message the card displayed. A fictional or redacted example is enough to start a map-format investigation.
 
-The bundled Three.js renderer includes its [MIT license](licenses/three.txt).
+## License
+
+The card is distributed under the [MIT license](LICENSE). The bundled Three.js renderer includes its [MIT license](licenses/three.txt).
