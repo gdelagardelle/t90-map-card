@@ -7,6 +7,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { setupFurnishings } from './ecovacs-furnishings.js';
 import { setupWallEditor } from './ecovacs-wall-editor.js';
+import { installHistoryReplay, boundedSubpaths, MAX_ROUTE_POINTS, MAX_ROUTE_SEGMENTS } from './history-route-scene.js';
 import { RunTrail } from './ecovacs-run-trail.js';
 import { scan, scope } from './scene-context.js';
 
@@ -598,7 +599,8 @@ function renderPreview() {
         #include <colorspace_fragment>
       }`
   });
-  let lastSample;
+  let lastSample,historyReplay;
+  let captured=[],captureChanged=false;
   let traceSegments = 0;
   const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   motionPreference.addEventListener('change', syncPulse);
@@ -614,10 +616,11 @@ function renderPreview() {
     syncPulse();
   }
   function syncPulse() {
+    historyReplay?.validate();
     const cleaning = lastSample?.state === 'cleaning';
     const visible = route.visible && traceSegments > 0 &&
       !viewer.classList.contains('show-source') && viewer.parentElement.dataset.editing !== 'true';
-    const canReplay = visible && !cleaning && !motionPreference.matches;
+    const canReplay = visible && !cleaning && !motionPreference.matches && !historyReplay?.active;
     if (!canReplay && replayTimer !== null) {
       clearTimeout(replayTimer);
       replayTimer = null;
@@ -645,6 +648,7 @@ function renderPreview() {
     traceSegments = 0;
     totalLength.value=0;
     travelSegments.length=0;
+    const strokes=[];
     let matching = Boolean(baselinePath);
     for (const [index, path] of (routePath?.subPaths ?? []).entries()) {
       let points = path.getPoints(1);
@@ -657,6 +661,7 @@ function renderPreview() {
         points = points.slice(Math.max(0, count - 1));
       }
       if (points.length < 2) continue;
+      strokes.push(points.map(p=>[p.x,p.y]));
       const distances=[totalLength.value];
       for(let i=1;i<points.length;i++) {
         const a=points[i-1], b=points[i], start=distances[i-1];
@@ -684,8 +689,18 @@ function renderPreview() {
         if (material===luminous) strip.renderOrder=2;
       }
     }
+    captured=boundedSubpaths(strokes);captureChanged=true;
     viewer.dataset.traceSegments = String(traceSegments);
   }
+  const host=window.frameElement.t90Map;
+  historyReplay=installHistoryReplay({host,viewer,parent:model,width:3.9,lift:.52,
+    compatible:snapshot=>snapshot.space==='ecovacs-map' && snapshot.anchor===null,
+    available:()=>['idle','docked','charging'].includes(lastSample?.state) && !viewer.classList.contains('show-source') &&
+      viewer.parentElement.dataset.editing!=='true',
+    offset:()=>[0,0],draw,changed:active=>{
+      route.visible=!active && routeButton.getAttribute('aria-pressed')==='true';
+      if(active)finishReplay();else syncPulse();
+    }});
   replaceRoute(routePath);
   model.add(route);
 
@@ -830,6 +845,7 @@ function renderPreview() {
   new MutationObserver(syncPulse).observe(viewer,{attributes:true,attributeFilter:['class']});
   new MutationObserver(syncPulse).observe(viewer.parentElement,{attributes:true,attributeFilter:['data-editing']});
   routeButton.addEventListener('click', () => {
+    if(historyReplay.active)historyReplay.stop();
     route.visible = !route.visible;
     routeButton.setAttribute('aria-pressed', String(route.visible));
     syncPulse();
@@ -1018,6 +1034,11 @@ function renderPreview() {
       replaceRoute(sample.route === baseline ? null : parseTrail(sample.route), parseTrail(baseline));
       previousRoute = sample.route;
       previousBaseline = baseline;
+    }
+    if(captureChanged && ['cleaning','paused','returning'].includes(sample.state)){
+      host.onHistoryRoute?.({scope,space:'ecovacs-map',anchor:null,segments:captured,
+        partial:captured.length>=MAX_ROUTE_SEGMENTS || captured.reduce((n,line)=>n+line.length,0)>=MAX_ROUTE_POINTS});
+      captureChanged=false;
     }
     rooms.setActivePosition(sample.xy,sample.state==='cleaning');
     vacuum.visible = Boolean(sample.xy);

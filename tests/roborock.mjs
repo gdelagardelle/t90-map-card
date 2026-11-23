@@ -82,13 +82,17 @@ try {
       const state=async value=>page.evaluate(value=>{
         hass.states['vacuum.test'].state=value;card.refresh();
       },value);
+      await page.evaluate(()=>{
+        const host=card.frame.t90Map, capture=host.onHistoryRoute;
+        host.onHistoryRoute=snapshot=>{capture?.(snapshot);window.historyRoute=structuredClone(snapshot);};
+      });
       await state('cleaning');
       assert.equal(await pathButton.getAttribute('aria-pressed'),'true');
       await page.evaluate(async()=>{
         const bitmap=await createImageBitmap(mapImage),cv=document.createElement('canvas');
         cv.width=bitmap.width;cv.height=bitmap.height;
         const ctx=cv.getContext('2d');ctx.drawImage(bitmap,0,0);bitmap.close();
-        ctx.fillStyle='#93c2ee';ctx.fillRect(15,105,92,5);ctx.fillRect(102,75,5,35);
+        ctx.fillStyle='#93c2ee';ctx.fillRect(15,105,92,5);ctx.fillRect(102,75,5,35);ctx.fillRect(155,122,19,3);
         card.rrBlob=await new Promise(resolve=>cv.toBlob(resolve));card.refresh();
       });
       await frame.locator('.viewer[data-route-pulse=moving]').waitFor();
@@ -101,9 +105,27 @@ try {
       await state('paused');assert.equal(await viewer.getAttribute('data-route-pulse'),'off');
       await state('cleaning');await frame.locator('.viewer[data-route-pulse=moving]').waitFor();
       await pathButton.click();assert.equal(await viewer.getAttribute('data-route-pulse'),'off');
+      const capture=await page.evaluate(()=>{
+        const {space,segments}=historyRoute;
+        return {space,parts:segments.length,canStart:card.frame.contentWindow.t90ReplayHistory(historyRoute)};
+      });
+      assert.equal(capture.space,'roborock-image');assert.ok(capture.parts>=2);assert.equal(capture.canStart,false);
       await state('docked');
       await page.evaluate(()=>{card.rrBlob=mapImage;card.refresh();});
       await page.waitForFunction(()=>card.rrDisplayed===mapImage);
+      const liveFloor=await canvas.screenshot();
+      await page.emulateMedia({reducedMotion:'reduce'});
+      assert.deepEqual(await page.evaluate(()=>{
+        const scene=card.frame.contentWindow;
+        return [scene.t90ReplayHistory({...historyRoute,scope:'other floor'}),
+          scene.t90ReplayHistory({...historyRoute,anchor:{...historyRoute.anchor,width:8}}),
+          scene.t90ReplayHistory(historyRoute)];
+      }),[false,false,true]);
+      await frame.locator('.viewer[data-history-replay=still]').waitFor();
+      assert.ok(!liveFloor.equals(await canvas.screenshot()),'Historical native ink should remain visible after the live frame resets');
+      await page.evaluate(()=>card.frame.contentWindow.t90StopHistoryReplay());
+      assert.ok(liveFloor.equals(await canvas.screenshot()),'Stopping replay restores the original map');
+      await page.emulateMedia({reducedMotion:'no-preference'});
     }
     const hidden=await canvas.screenshot();
     const carpetButton=frame.getByRole('button',{name:'Carpet scan',exact:true});

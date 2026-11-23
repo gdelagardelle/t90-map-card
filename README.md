@@ -1,6 +1,6 @@
 # T90 3D Map Card
 
-Build an editable 3D floor plan from your vacuum’s map in Home Assistant. [Beta 8](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.8) adds saved cleaning routines, clearer live status, and lamps and LED strips that mirror real lights on the Ecovacs T90 and Roborock Qrevo maps. The screenshots use fictional homes.
+Build an editable 3D floor plan from your vacuum’s map in Home Assistant. [Beta 9](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.9) adds a Last clean summary, glowing route replay and a pinned cleaning routine on the Ecovacs T90 and Roborock Qrevo maps. The screenshots use fictional homes.
 
 All five downloads include guided setup and a local test report. The four companion modules are the tested beta 7 builds and still report their own beta 7 version. Choose the module for your Home Assistant integration below.
 
@@ -14,7 +14,7 @@ All five downloads include guided setup and a local test report. The four compan
 
 ## Which download fits your robot?
 
-| Robot or integration | Download from the beta 8 release | What you need |
+| Robot or integration | Download from the beta 9 release | What you need |
 | --- | --- | --- |
 | Ecovacs T90, Roborock Qrevo | `t90-map-card.js` | Official integration and the vacuum’s map image. Both have 3D layout recovery and compact phone controls. |
 | Dreame L40s Pro Ultra | `dreame-map-card-beta.js` | Tasshack’s Dreame Vacuum integration with the current floor map camera. [Dreame guide](https://github.com/gdelagardelle/t90-map-card/blob/ded6ba7d724f1930810cfd0e3bb81e2b92aae5e1/docs/dreame.md) |
@@ -22,7 +22,7 @@ All five downloads include guided setup and a local test report. The four compan
 | Roomba/Braava, Shark IQ, Xiaomi Mi Robot, Matter vacuum | `vacuum-controls-card.js` | The corresponding HA integration and a vacuum entity. An optional image or camera provides a map. A compatible Roomba+ Rooms Map can provide 3D room outlines. [Controls guide](https://github.com/gdelagardelle/t90-map-card/blob/ded6ba7d724f1930810cfd0e3bb81e2b92aae5e1/testers/vacuum-controls/START-HERE.md) |
 | Robot already running Valetudo | `valetudo-map-card.js` | MQTT discovery and the robot’s Map data camera. This tester displays the native map. [Valetudo guide](https://github.com/gdelagardelle/t90-map-card/blob/ded6ba7d724f1930810cfd0e3bb81e2b92aae5e1/testers/valetudo/README.md) |
 
-Get your JavaScript module from the [beta 8 release assets](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.8). When updating a manual installation, replace the same file, change the existing resource URL’s version query to `?v=beta8`, and reload the dashboard.
+Get your JavaScript module from the [beta 9 release assets](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.9). When updating a manual installation, replace the same file, change the existing resource URL’s version query to `?v=beta9`, and reload the dashboard.
 
 ## Before installing
 
@@ -34,7 +34,7 @@ Get your JavaScript module from the [beta 8 release assets](https://github.com/g
 ## Install with HACS
 
 1. Open **HACS → ⋮ → Custom repositories**. Paste `https://github.com/gdelagardelle/t90-map-card` and choose **Dashboard** as the type.
-2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For routines, live status and linked lighting, open **Need a different version?** and select **v0.3.0-beta.8**. Reload your dashboard after installation.
+2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For Last clean, replay and pinned favorites, open **Need a different version?** and select **v0.3.0-beta.9**. Reload your dashboard after installation.
 3. Edit your dashboard and choose **Add card → T90 3D Map**. Pick your vacuum. The editor suggests its integration and selects the map when it finds exactly one available image on the same device. If there are several, choose the floor you recognize in the preview. When Home Assistant omits device information, select the format and image manually.
 4. Check the preview and the detected features, then save the card. An unconfirmed feature means the editor could not verify it with the current data. For a missing map, open **Settings → Devices & services**, open the vacuum’s device, and enable its map image. The companion editors have their own source requirements. SwitchBot and Vacuum Controls also work without a map.
 
@@ -50,6 +50,18 @@ On the dashboard, open **Test details**, review the preview and choose **Copy te
 4. Use **Edit** to rename a routine or change its rooms and settings. After a remap or a room rename, review and match the target again. **Remove** deletes a routine after confirmation.
 
 Saving routines requires a storage dashboard you can edit. Each routine belongs to one vacuum and floor. A routine does not create a schedule or run in the background.
+
+### Pin a favorite beside Start
+
+Open **Cleaning routines**, select a saved routine on this floor and choose **Pin as favorite**. Tap the star beside **Start** to review its rooms and settings. **Start routine** sends the cleaning command. Pin another routine to replace the favorite, or choose **Unpin favorite** to remove the shortcut. The pin is saved with the dashboard for that vacuum and floor.
+
+### Last clean and glowing replay
+
+Open **Last clean** below the map to check the latest run. It distinguishes the rooms you requested, the rooms where the integration reported seeing the robot, and the outcome the device reported. When the robot is idle or docked, choose **Replay route** to follow the recorded path in the 3D map. **Return to live map** ends playback. Reduced motion shows the recorded route without animation.
+
+Route recordings are local to the browser and floor. Leave the dashboard open during a clean to capture its route. Gaps stay separate and partial recordings are labeled. Roborock captures the order in which new trail pixels appear in its map images. If you were away, the card can still show a timestamped last-job report when your integration provides one. If a last-job report is missing or old, the card can also read up to 48 hours of recorded vacuum state changes from Home Assistant. A report with no matching route has no replay. Replaying a route sends no robot commands.
+
+![Glowing route replay on a fictional furnished floor](docs/last-clean-replay.png)
 
 ### Read the live status
 
@@ -73,7 +85,7 @@ This repository can be added directly to HACS. [HACS custom repository instructi
 
 ## Manual install
 
-1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.8/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
+1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.9/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
 2. In **Settings → Dashboards → ⋮ → Resources**, add `/local/t90-map-card.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. Reload the page.
 3. Use the visual editor or add a manual card with your own entity IDs.
 
@@ -116,7 +128,7 @@ While editing the floor plan or furnishings, use **+** and **−**, scroll over 
 
 On a single saved floor, tap a room’s stock floor color or open **Choose rooms**. Check the names on **Start**, then press it to clean. Path markings, carpets, ambiguous colors and walls do not select a room. The room buttons also work for rooms obscured by overlays. Keep the default integration colors for map taps. Multiple saved floors can be viewed individually via their image entities; room commands are available only with one reported floor. Pause, resume, stop and return to dock use the selected vacuum entity.
 
-Map rendering and room selections have been exercised against Qrevo 2 Pro Series and Qrevo Edge 2 Set images. Room commands were verified with a service recorder. Other Roborock families and physical room-clean execution have not been verified.
+Map rendering and room selections have been exercised against Qrevo 2 Pro Series and Qrevo Edge 2 Set images. In a physical Qrevo 2 Pro Series test, the card sent the saved room ID, the robot reported segment cleaning, and it returned to charging after reporting 0.0 m². This run verified dispatch and the state transitions. Cleaning coverage in the requested room remains unconfirmed. Other Roborock families need hardware testing.
 
 ## Map appearance
 
@@ -128,7 +140,7 @@ Tap a room on the floor. On the first tap, choose its Ecovacs room name and sele
 
 Check **Cleaning target** before pressing **Start**. If the target reads **Kitchen · Living room**, the card sends those two room IDs. **Whole home** starts a whole-home clean. While paused, **Resume** continues the existing job. **Change a map room name** lets you correct an assignment.
 
-On an Ecovacs T90 MAX PLUS OMNI identified by Home Assistant as `b7vftn`, the card uses the newer `clean_V2` command. Whole-home Start was tested on hardware running firmware 1.67.2. The station washed the mop before the vacuum reported cleaning. Room commands for this model have been checked in browser tests. A message under Start shows whether the robot has acknowledged cleaning. If Home Assistant loses the selected floor or room list, the card preserves the target or asks you to choose it again.
+On an Ecovacs T90 MAX PLUS OMNI identified by Home Assistant as `b7vftn`, the card uses the newer `clean_V2` command. Whole-home Start was tested on hardware running firmware 1.67.2. The station washed the mop before the vacuum reported cleaning. In a physical saved-routine test, the robot reported cleaning and returned to its dock. The area sensor stayed at zero, so coverage of the requested room remains unconfirmed. A message under Start shows whether the robot has acknowledged cleaning. If Home Assistant loses the selected floor or room list, the card preserves the target or asks you to choose it again.
 
 The glowing marker follows the latest reported position. The card checks the map while the dashboard is visible. Update speed depends on how often the integration publishes a new image. A new observed cleaning run masks the previous run’s path. Settings, dock actions, and maintenance readings depend on which entities the integration exposes and enables for your device.
 

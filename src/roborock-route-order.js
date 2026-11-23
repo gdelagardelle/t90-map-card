@@ -1,3 +1,4 @@
+import { compactSubpath, MAX_ROUTE_POINTS, MAX_ROUTE_SEGMENTS } from './history-route-scene.js';
 // Stock PNGs contain ink but no timestamps. Preserve first appearance across
 // frames. Within one arrival, estimate travel order along connected ink toward
 // the robot. Never connect separated marks through a wall or unscanned floor.
@@ -8,6 +9,7 @@ export class RasterRoute {
     const n=width*height;
     this.ranks=new Uint32Array(n);
     this.rgba=new Uint8Array(n*4);
+    this.segments=[];this.pointCount=0;
     if(baseline)for(let p=0;p<n;p++)if(isInk(baseline,4*p))this.ranks[p]=0xffffffff;
   }
   update(data,robot) {
@@ -44,16 +46,45 @@ export class RasterRoute {
     }
     groups.sort((a,b)=>b.near-a.near);
     for(const {tip} of groups){
-      const cells=[tip],levels=[0];fresh[tip]=0;
+      const cells=[tip],levels=[0],parents=[-1];fresh[tip]=0;
       for(let i=0;i<cells.length;i++)neighbors(cells[i],k=>{
-        fresh[k]=0;cells.push(k);levels.push(levels[i]+1);
+        fresh[k]=0;cells.push(k);levels.push(levels[i]+1);parents.push(i);
       });
       const last=this.end+1+levels.at(-1);
       for(let i=0;i<cells.length;i++){
         const p=cells[i],k=4*p,rank=last-levels[i];
         ranks[p]=rank;rgba[k]=rank>>>16;rgba[k+1]=rank>>>8;rgba[k+2]=rank;rgba[k+3]=255;
       }
+      this.capture(cells,parents);
       this.end=last;
     }
   }
+  // The breadth-first tree consists exclusively of neighboring native ink pixels.
+  // Follow its longest branch towards the observed tip, then retain side branches.
+  // A one-pixel shoulder suppresses duplicate traces on thick scan strokes.
+  capture(cells,parents) {
+    const covered=new Set(),w=this.width;
+    for(let i=cells.length-1;i>=0;i--){
+      const remaining=MAX_ROUTE_POINTS-this.pointCount;
+      if(remaining<2 || this.segments.length>=MAX_ROUTE_SEGMENTS)return;
+      if(covered.has(cells[i]))continue;
+      const chain=[];let j=i;
+      while(j>=0 && !covered.has(cells[j])){chain.push(cells[j]);j=parents[j];}
+      if(j>=0)chain.push(cells[j]);
+      for(const p of chain){
+        const x=p%w,y=Math.floor(p/w);
+        for(let dy=-1;dy<=1;dy++)
+          for(let dx=Math.max(-1,-x);dx<=Math.min(1,w-1-x);dx++)covered.add((y+dy)*w+x+dx);
+      }
+      if(j>=0 && chain.length<4)continue;
+      if(chain.length===1){
+        const x=chain[0]%w,z=Math.floor(chain[0]/w);
+        this.segments.push([[x+.35,z+.5],[x+.65,z+.5]]);
+        this.pointCount+=2;continue;
+      }
+      const line=compactSubpath(chain.map(p=>[p%w+.5,Math.floor(p/w)+.5])).slice(0,remaining);
+      this.segments.push(line);this.pointCount+=line.length;
+    }
+  }
+
 }
