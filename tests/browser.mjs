@@ -62,9 +62,30 @@ try {
     card.config.maps={ [card.scope]:{room_bindings:Object.fromEntries(rooms.map(([name,id,d])=>[d,id]))} };
     card.refresh();
   },{rooms});
+  const lookButton = name => card.getByRole('button',{name,exact:true});
+  const layoutBounds = () => card.evaluate(c => {
+    const map = c.frame.getBoundingClientRect(), robot = c.q('.robot-panel').getBoundingClientRect();
+    return { below:robot.top >= map.bottom - 1, beside:robot.left >= map.right - 1 };
+  });
+  assert.equal(await lookButton('Daylight').getAttribute('aria-pressed'),'true');
+  assert.equal((await layoutBounds()).below,true);
+  assert.equal(await scene.locator('.tools').evaluate(el=>el.getBoundingClientRect().bottom <= window.innerHeight),true);
   if (process.argv.includes('--pictures')) {
-    await mkdir('docs',{recursive:true}); await card.locator('.cockpit').screenshot({path:'docs/dashboard.png'});
+    await mkdir('docs',{recursive:true});
+    await card.locator('.cockpit').screenshot({path:'docs/dashboard.png'});
   }
+  const originalCanvas = await scene.locator('canvas').elementHandle();
+  await lookButton('Night').click();
+  assert.equal(await scene.locator('html').getAttribute('data-appearance'),'night');
+  assert.equal((await layoutBounds()).beside,true);
+  assert.equal(await originalCanvas.evaluate(canvas => canvas.isConnected),true);
+  assert.equal(await start.isEnabled(),true);
+  if (process.argv.includes('--pictures')) await card.locator('.cockpit').screenshot({path:'docs/dashboard-night.png'});
+  await page.setViewportSize({width:390,height:844});
+  assert.equal((await layoutBounds()).below,true);
+  assert.equal(await scene.locator('.tools').evaluate(el=>el.getBoundingClientRect().bottom <= window.innerHeight),true);
+  assert.equal(await card.evaluate(c => c.scrollWidth <= c.clientWidth),true);
+  await page.setViewportSize({width:1410,height:935});
   await scene.getByRole('button',{name:'Lock layout',exact:true}).click();
   assert.equal(await scene.getByRole('button',{name:'Edit walls'}).count(),0);
   await page.evaluate(()=>{card.frame.srcdoc=card.frame.srcdoc;});
@@ -82,7 +103,38 @@ try {
   await scene.locator('canvas').press('PageDown');
   await scene.getByRole('button',{name:'Drag to rotate furniture'}).waitFor();
   if(process.argv.includes('--pictures')) await viewer.screenshot({path:'docs/furniture-editor.png'});
+  const readFurniture = () => page.evaluate(() => JSON.parse(localStorage.getItem(card.layoutKeys[0])).items);
+  const oldItems = await readFurniture();
+  const canvasKeys = scene.locator('canvas');
+  for (const [kind,name] of Object.entries({
+    ledStrip:'LED strip',floorLamp:'Floor lamp',plant:'Potted plant',officeDesk:'Office desk',officeChair:'Office chair'
+  })) {
+    await scene.getByRole('button',{name:'Add furniture',exact:true}).click();
+    await scene.getByRole('button',{name,exact:true}).click();
+    await canvasKeys.press('Enter');
+    const placed = (await readFurniture()).at(-1);
+    assert.equal(placed.kind,kind);
+    await canvasKeys.press('ArrowRight');
+    await scene.getByRole('button',{name:'Drag to rotate furniture'}).press('Shift+ArrowLeft');
+    await scene.getByRole('button',{name:'Resize',exact:true}).click();
+    await scene.getByRole('slider',{name:'Width',exact:true}).press('ArrowRight');
+    const edited = (await readFurniture()).at(-1);
+    assert.equal(edited.x,placed.x+1.5);
+    assert.ok(Math.abs(edited.rotation - 15/90) < 1e-8);
+    assert.equal(edited.width,105);
+  }
+  const editedItems = await readFurniture();
+  assert.deepEqual(editedItems.slice(0,oldItems.length),oldItems);
+  await lookButton('Daylight').click();
+  assert.equal(await scene.locator('.selected-name').innerText(),'Office chair');
+  assert.equal(await scene.locator('html').getAttribute('data-appearance'),'daylight');
+  await lookButton('Night').click();
   await scene.getByRole('button',{name:'Done',exact:true}).click();
+  await page.evaluate(() => { card.frame.srcdoc = card.frame.srcdoc; });
+  await scene.locator('[data-tracking=live]').waitFor();
+  assert.equal(await viewer.getAttribute('data-furnishings'),String(editedItems.length));
+  assert.deepEqual(await readFurniture(),editedItems);
+  assert.equal(await scene.locator('html').getAttribute('data-appearance'),'night');
   const f=page.frames().find(frame=>frame.parentFrame());
   await f.getByRole('button',{name:'Top view'}).click();await f.waitForFunction(()=>document.querySelector('.viewer').dataset.cameraMotion==='idle');
   await page.evaluate(()=>{card.selectedRooms.clear();card.config.maps={};card.refresh();});
@@ -123,6 +175,7 @@ try {
   });
   const second=page.locator('t90-map-card').nth(1);
   await second.frameLocator('iframe').locator('[data-furnishings="0"][data-tracking="live"]').waitFor();
+  assert.equal(await second.getAttribute('data-appearance'),'daylight');
   await second.locator('.rooms summary').click();
   await second.getByRole('button',{name:'Office',exact:true}).click();
   await second.getByRole('button',{name:'Start · Office',exact:true}).click();
@@ -137,6 +190,16 @@ try {
     await scene.locator('[data-tracking=live]').waitFor();
     console.log('Additional local Ecovacs SVG rendered successfully.');
   }
+  await page.evaluate(() => {
+    const replacement = document.createElement('t90-map-card');
+    card.replaceWith(replacement);
+    window.card = replacement;
+    card.setConfig(config);
+    card.hass = hass;
+  });
+  assert.equal(await lookButton('Night').getAttribute('aria-pressed'),'true');
+  await scene.locator('[data-tracking=live]').waitFor();
+  assert.equal(await scene.locator('html').getAttribute('data-appearance'),'night');
   assert.deepEqual(errors,[]);
   console.log('Passed: dynamic maps, clean initial layout, floor switch, scoped edits, room 0, lock and room taps, wall angle, furniture handles, pause/resume, invalid map.');
 } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }

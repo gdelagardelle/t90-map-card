@@ -1,0 +1,24 @@
+:host, :root {
+  color-scheme: light;
+  --paper: #f9f6f0;
+  --ink: #302d28;
+  --dim: #59534b;
+  --edge: #d9d1c4;
+  --accent: #914124;
+  --primary: #813d29;
+  --on-primary: #fff9ee;
+  --selected: #f4e6d7;
+  --map-surface: radial-gradient(ellipse at 20% 0%, #fcf9f3, transparent 68%), linear-gradient(120deg, #eae1d2, #f1e9dd 67%, #e9dfd3);
+}
+:host([data-appearance="night"]), :root[data-appearance="night"] {
+  color-scheme: dark;
+  --paper: #202425;
+  --ink: #f4eee5;
+  --dim: #b6b3aa;
+  --edge: #434747;
+  --accent: #f6c584;
+  --primary: #edbe7b;
+  --on-primary: #251c13;
+  --selected: #3b3024;
+  --map-surface: radial-gradient(ellipse at 50% 53%, #3a3931, #282a29 50%, #1b2022 90%);
+}
