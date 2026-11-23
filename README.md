@@ -1,8 +1,8 @@
 # T90 3D Map Card
 
-Build an editable 3D floor plan from your robot’s map in Home Assistant. [Beta 5](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.5) includes the Ecovacs T90 and Roborock Qrevo map editors. T90 owners get a compact control panel, a brighter traveling light along the cleaning path, and a model-specific Start fix for the T90 MAX PLUS OMNI. All screenshots use fictional maps.
+Build an editable 3D floor plan from your robot’s map in Home Assistant. [Beta 6](https://github.com/gdelagardelle/t90-map-card/releases/tag/v0.3.0-beta.6) includes the Ecovacs T90 and Roborock Qrevo map editors. T90 owners get a compact control panel, a brighter traveling light along the cleaning path, and a model-specific Start fix for the T90 MAX PLUS OMNI. During a selected-room clean, map updates keep the command status steady. All screenshots use fictional maps.
 
-For Dreame, SwitchBot, Roomba, Shark, Xiaomi, Matter and Valetudo, see the [compatibility table and installation guides](https://github.com/gdelagardelle/t90-map-card/blob/v0.3.0-beta.4/README.md#which-download-fits-your-robot). The beta 5 release also includes those four tester modules.
+For Dreame, SwitchBot, Roomba, Shark, Xiaomi, Matter and Valetudo, see the [compatibility table and installation guides](https://github.com/gdelagardelle/t90-map-card/blob/v0.3.0-beta.4/README.md#which-download-fits-your-robot). The beta 6 release also includes those four tester modules.
 
 ![Roborock preview with a white Qrevo beside the controls and on a furnished fictional floor](docs/roborock-qrevo.png)
 
@@ -22,14 +22,14 @@ For Dreame, SwitchBot, Roomba, Shark, Xiaomi, Matter and Valetudo, see the [comp
 ## Install with HACS
 
 1. Open **HACS → ⋮ → Custom repositories**. Paste `https://github.com/gdelagardelle/t90-map-card` and choose **Dashboard** as the type.
-2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For the T90 Start and trail fixes or Roborock support, open **Need a different version?** and select **v0.3.0-beta.5**. Reload your dashboard after installation.
+2. Add the repository, open **T90 3D Map Card**, and choose **Download** (or **Redownload**). For the T90 Start and trail fixes or Roborock support, open **Need a different version?** and select **v0.3.0-beta.6**. Reload your dashboard after installation.
 3. Edit your dashboard and select **Add card → T90 3D Map**. Select your map source, vacuum, and its map image.
 
 This repository can be added directly to HACS. [HACS custom repository instructions](https://www.hacs.xyz/docs/faq/custom_repositories/)
 
 ## Manual install
 
-1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.5/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
+1. Download [the beta JavaScript module](https://github.com/gdelagardelle/t90-map-card/releases/download/v0.3.0-beta.6/t90-map-card.js) and place it at `config/www/t90-map-card.js`.
 2. In **Settings → Dashboards → ⋮ → Resources**, add `/local/t90-map-card.js` as a **JavaScript module**. Enable Advanced Mode in your user profile if Resources is hidden. Reload the page.
 3. Use the visual editor or add a manual card with your own entity IDs.
 
