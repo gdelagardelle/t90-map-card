@@ -128,7 +128,7 @@ While editing the floor plan or furnishings, use **+** and **−**, scroll over 
 
 On a single saved floor, tap a room’s stock floor color or open **Choose rooms**. Check the names on **Start**, then press it to clean. Path markings, carpets, ambiguous colors and walls do not select a room. The room buttons also work for rooms obscured by overlays. Keep the default integration colors for map taps. Multiple saved floors can be viewed individually via their image entities; room commands are available only with one reported floor. Pause, resume, stop and return to dock use the selected vacuum entity.
 
-Map rendering and room selections have been exercised against Qrevo 2 Pro Series and Qrevo Edge 2 Set images. Room commands were verified with a service recorder. Other Roborock families and physical room-clean execution have not been verified.
+Map rendering and room selections have been exercised against Qrevo 2 Pro Series and Qrevo Edge 2 Set images. In a physical Qrevo 2 Pro Series test, the card sent the saved room ID, the robot reported segment cleaning, and it returned to charging after reporting 0.0 m². This run verified dispatch and the state transitions. Cleaning coverage in the requested room remains unconfirmed. Other Roborock families need hardware testing.
 
 ## Map appearance
 
@@ -140,7 +140,7 @@ Tap a room on the floor. On the first tap, choose its Ecovacs room name and sele
 
 Check **Cleaning target** before pressing **Start**. If the target reads **Kitchen · Living room**, the card sends those two room IDs. **Whole home** starts a whole-home clean. While paused, **Resume** continues the existing job. **Change a map room name** lets you correct an assignment.
 
-On an Ecovacs T90 MAX PLUS OMNI identified by Home Assistant as `b7vftn`, the card uses the newer `clean_V2` command. Whole-home Start was tested on hardware running firmware 1.67.2. The station washed the mop before the vacuum reported cleaning. Room commands for this model have been checked in browser tests. A message under Start shows whether the robot has acknowledged cleaning. If Home Assistant loses the selected floor or room list, the card preserves the target or asks you to choose it again.
+On an Ecovacs T90 MAX PLUS OMNI identified by Home Assistant as `b7vftn`, the card uses the newer `clean_V2` command. Whole-home Start was tested on hardware running firmware 1.67.2. The station washed the mop before the vacuum reported cleaning. In a physical saved-routine test, the robot reported cleaning and returned to its dock. The area sensor stayed at zero, so coverage of the requested room remains unconfirmed. A message under Start shows whether the robot has acknowledged cleaning. If Home Assistant loses the selected floor or room list, the card preserves the target or asks you to choose it again.
 
 The glowing marker follows the latest reported position. The card checks the map while the dashboard is visible. Update speed depends on how often the integration publishes a new image. A new observed cleaning run masks the previous run’s path. Settings, dock actions, and maintenance readings depend on which entities the integration exposes and enables for your device.
 
