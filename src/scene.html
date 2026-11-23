@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deebot T90 | 3D vacuum map</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #101112;
+      color: #f3ebe1;
+      --quiet: #bbb3ab;
+      --line: #413932;
+      --amber: #ffba73;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0;
+      padding: clamp(18px, 4vw, 58px);
+      display: grid;
+      align-items: center;
+      background: radial-gradient(ellipse at 23% 0%, #251e1a, #101112 61%);
+    }
+    main { width: min(100%, 1460px); margin: auto; }
+    header {
+      display: flex;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 18px 30px;
+      margin: 0 0 19px;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: clamp(30px, 4vw, 55px);
+      font-weight: 660;
+      line-height: 1.07;
+      letter-spacing: -0.04em;
+    }
+    header p { margin: 0; color: var(--quiet); }
+    nav { display: flex; flex-wrap: wrap; gap: 6px; }
+    button, select {
+      min-height: 44px;
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #1e1d1c;
+      color: inherit;
+      font: inherit;
+    }
+    button {
+      cursor: pointer;
+    }
+    button[aria-pressed="true"] { color: #ffd7af; border-color: #8e6241; background: #39291e; }
+    button:hover:enabled { background: #40312a; }
+    button:disabled { opacity: 0.46; cursor: default; }
+    button:focus-visible, canvas:focus-visible, select:focus-visible, input:focus-visible {
+      outline: 2px solid var(--amber);
+      outline-offset: 3px;
+    }
+    .stage {
+      display: grid;
+      grid-template: "device map" minmax(0, 1fr) / minmax(242px, 0.31fr) minmax(0, 1fr);
+      gap: 15px;
+    }
+    .viewer {
+      grid-area: map;
+      position: relative;
+      overflow: hidden;
+      height: clamp(455px, 70dvh, 820px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: radial-gradient(ellipse at 42% 36%, #37302a 0%, #272523 48%, #171819 100%);
+    }
+    .viewer canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+    .viewer[data-placing="true"] canvas { cursor: crosshair; }
+    .viewer[data-dragging="true"] canvas { cursor: grabbing; }
+    canvas:active { cursor: grabbing; }
+    canvas:focus-visible { outline-offset: -5px; }
+    .compare {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      padding: clamp(18px, 6vw, 90px);
+      object-fit: contain;
+      background: #2d2b2a;
+    }
+    .show-source canvas { visibility: hidden; }
+    .notice {
+      position: absolute;
+      z-index: 1;
+      top: 12px;
+      inset-inline: 15px;
+      text-align: center;
+      color: #fff0db;
+    }
+    .dock-pin {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+      min-height: 34px;
+      padding: 5px 10px;
+      border-color: #8a5f3f;
+      background: #26201b;
+      color: #ffdbb7;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .dock-pin::before {
+      position: absolute;
+      content: "";
+      top: 50%;
+      left: -12px;
+      width: 11px;
+      height: 1px;
+      background: #ffba73;
+      pointer-events: none;
+    }
+    .device {
+      grid-area: device;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+      padding: clamp(16px, 2vw, 26px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: radial-gradient(ellipse at 38% 32%, #302620 0%, #1a1918 65%);
+    }
+    .device h2 {
+      color: #fff2e6;
+      margin: 0;
+      font-size: clamp(22px, 2.1vw, 31px);
+      line-height: 1.15;
+      letter-spacing: -0.035em;
+    }
+    .device p { margin: 7px 0 0; color: var(--quiet); }
+    .device .furnishing-note { font-size: 13px; }
+    .product { width: 100%; margin: auto; }
+    .product img { display: block; width: 100%; }
+    .stage[data-editing="true"] { grid-template: "map" auto / minmax(0, 1fr); }
+    .stage[data-editing="true"] .device { display: none; }
+    .tools { display: grid; gap: 8px; }
+    .tools button { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+    .tools .switch {
+      position: relative;
+      flex: 0 0 28px;
+      height: 16px;
+      border: 1px solid #776557;
+      border-radius: 9px;
+    }
+    .tools .switch::before {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d0c1af;
+    }
+    .tools button[aria-pressed="true"] .switch { background: #ffbd81; border-color: #ffbd81; }
+    .tools button[aria-pressed="true"] .switch::before { left: 15px; background: #38261c; }
+    .map-editor {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      font-size: 13px;
+    }
+    .editor-top, .editor-bottom { position: absolute; inset-inline: 14px; }
+    .editor-top { top: 14px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+    .editor-top button, .furnishing-palette, .edit-selection { pointer-events: auto; }
+    .editor-top .edit-actions { display: flex; gap: 6px; margin-left: auto; }
+    .wall-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+    .furnishing-palette {
+      position: absolute;
+      top: 52px;
+      left: 0;
+      display: grid;
+      width: min(320px, 100%);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      max-height: min(65dvh, 367px);
+      overflow-y: auto;
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #211e1b;
+    }
+    .furnishing-palette button { padding-inline: 9px; text-align: left; }
+    .editor-bottom { bottom: 14px; display: grid; justify-items: center; gap: 7px; }
+    .edit-selection {
+      display: grid;
+      width: max-content;
+      max-width: 100%;
+      gap: 7px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #211e1b;
+    }
+    .furnishing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .furnishing-actions strong { margin: 0 6px; }
+    .furnishing-actions button { padding-inline: 10px; }
+    .furnishing-size { display: grid; gap: 8px; padding: 6px 3px 3px; }
+    .map-editor .size {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr) 32px;
+      gap: 6px;
+      align-items: center;
+    }
+    .size input { width: 100%; min-width: 0; margin: 0; accent-color: var(--amber); }
+    .size output { text-align: right; color: var(--quiet); }
+    .edit-status {
+      max-width: min(100%, 44ch);
+      margin: 0;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: #211e1b;
+      color: #e9dbcd;
+      text-align: center;
+    }
+    .edit-status:empty { display: none; }
+    .furniture-corner {
+      position:absolute; width:30px; height:30px; touch-action:none; pointer-events:auto;
+      --ox:-5px; --oy:-5px; transform:translate(var(--ox),var(--oy)); cursor:nwse-resize;
+    }
+    .furniture-corner.nw,.furniture-corner.sw { --ox:calc(5px - 100%); }
+    .furniture-corner.nw,.furniture-corner.ne { --oy:calc(5px - 100%); }
+    .furniture-corner.ne,.furniture-corner.sw { cursor:nesw-resize; }
+    .furniture-corner::after {
+      content:"";position:absolute;width:10px;height:10px;box-sizing:border-box;
+      top:0;left:0;background:#ffcf9c;border:2px solid #493327;border-radius:3px;
+    }
+    .furniture-corner.nw::after,.furniture-corner.sw::after { left:auto;right:0; }
+    .furniture-corner.nw::after,.furniture-corner.ne::after { top:auto;bottom:0; }
+    .furniture-turn, .wall-turn {
+      position:absolute; transform:translate(-50%,-50%); pointer-events:auto; touch-action:none;
+      width:34px; height:34px; min-height:34px; padding:0; border-radius:50%;
+      border:2px solid #493327; background:#ffcf9c; color:#332217; font-size:22px;
+      line-height:1; cursor:grab;
+    }
+    .furniture-turn:hover:enabled, .wall-turn:hover:enabled { background:#ffe3bd; }
+    .furniture-turn::before, .wall-turn::before {
+      content:""; position:absolute; left:50%; top:50%; width:38px; height:1px;
+      background:linear-gradient(to right,transparent 17px,#ffcf9c 17px);
+      transform-origin:left center; transform:rotate(var(--stem-angle)); pointer-events:none;
+    }
+    .wall-handle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+      width: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      pointer-events: auto;
+      touch-action: none;
+      cursor: grab;
+    }
+    .wall-handle::after {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      border: 2px solid #332217;
+      border-radius: 50%;
+      background: #ffc084;
+      pointer-events: none;
+    }
+    .wall-handle:hover:enabled { background: transparent; }
+    .wall-measure { align-self:center; padding:4px 8px; font-variant-numeric:tabular-nums; }
+    #wall-editor .wall-selection { display: flex; flex-wrap: wrap; gap: 6px; }
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px 22px;
+      flex-wrap: wrap;
+      padding: 13px 2px 0;
+      color: var(--quiet);
+      font-size: 13px;
+    }
+    .legend { display: flex; gap: 16px; }
+    .legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .legend i { display: block; }
+    .line { width: 16px; height: 2px; border-radius: 2px; background: var(--amber); }
+    .ring { width: 9px; height: 9px; border: 1px solid var(--amber); border-radius: 50%; }
+    @media (max-width: 720px) {
+      .stage { grid-template: "map" auto "device" auto / minmax(0, 1fr); gap: 10px; }
+      .viewer { height: clamp(330px, 49dvh, 520px); }
+      header { margin-bottom: 13px; }
+      .device {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(80px, 30%);
+        align-items: center;
+        gap: 0 10px;
+        padding: 14px;
+      }
+      .tools { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stage[data-editing="true"] .viewer { height: clamp(410px, 65dvh, 630px); }
+      .furnishing-actions strong { width: 100%; }
+      .tools button { font-size: 14px; padding-inline: 10px; }
+    }
+  </style>
+<style>body{padding:16px;display:block;min-height:0}h1{font-size:26px}.stage{display:block}.viewer{height:clamp(295px,63vh,560px)}.device{display:block;padding:7px;border:0}.device>div:not(.tools),footer{display:none}.tools{display:flex;gap:5px;flex-wrap:wrap}.tools button{display:inline-grid;grid-auto-flow:column;grid-auto-columns:max-content;align-items:center;justify-content:center;gap:8px;flex:none;width:max-content;min-height:40px;padding:7px 12px;font-size:13px;white-space:nowrap}.tools .switch{width:28px;height:16px;margin:0}.tools{gap:8px}header{margin-bottom:10px}header nav button{min-height:36px;padding:5px 9px} @media(max-width:650px){header{gap:6px}.viewer{height:55vh}}</style></head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Vacuum map</h1>
+        <p class="feed-label">Ecovacs map</p>
+      </div>
+      <nav aria-label="Camera views">
+        <button type="button" data-camera="floor" aria-pressed="true">3D floor</button>
+        <button type="button" data-camera="top" aria-pressed="false">Top view</button>
+        <button type="button" data-camera="follow" aria-pressed="false" hidden>Follow Deebot</button>
+        <button type="button" data-camera="dock" aria-pressed="false">Dock close-up</button>
+      </nav>
+    </header>
+    <div class="stage">
+      <section class="viewer" aria-label="Vacuum floor plan" aria-describedby="map-help">
+        <p class="notice" role="status" hidden>3D is unavailable in this browser. Showing the original scan.</p>
+        <button type="button" class="dock-pin" aria-label="Focus on the dock" hidden>Dock</button>
+        <div class="map-editor" id="furnishing-editor" hidden>
+          <div class="editor-top">
+            <button type="button" data-furnishing="add" aria-expanded="false" aria-controls="furnishing-palette">Add furniture</button>
+            <div class="edit-actions">
+              <button type="button" data-furnishing="undo" hidden>Undo</button>
+              <button type="button" data-furnishing="done">Done</button>
+            </div>
+            <div class="furnishing-palette" id="furnishing-palette" role="group" aria-label="Furniture choices" hidden></div>
+          </div>
+          <div class="editor-bottom">
+            <p class="edit-status furnishing-status" role="status"></p>
+            <div class="edit-selection" hidden>
+              <div class="furnishing-actions">
+                <strong class="selected-name"></strong>
+                <button type="button" data-furnishing="rotate">Rotate</button>
+                <button type="button" data-furnishing="flip-chaise" hidden>Flip chaise</button>
+                <button type="button" data-furnishing="resize" aria-expanded="false" aria-controls="furnishing-size">Resize</button>
+                <button type="button" data-furnishing="remove">Remove</button>
+              </div>
+              <div class="furnishing-size" id="furnishing-size" hidden>
+                <label class="size">
+                  Width<input type="range" min="50" max="400" step="5" value="100" aria-label="Width">
+                  <output>100%</output>
+                </label>
+                <label class="size">
+                  Depth<input type="range" min="50" max="400" step="5" value="100" aria-label="Depth">
+                  <output>100%</output>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="map-editor" id="wall-editor" hidden>
+          <button type="button" class="wall-turn" aria-label="Drag to rotate wall" title="Drag to rotate. Arrow keys turn by 1°." hidden>↻</button>
+          <button type="button" class="wall-handle" data-wall-end="start" aria-label="Start of selected wall" hidden></button>
+          <button type="button" class="wall-handle" data-wall-end="end" aria-label="End of selected wall" hidden></button>
+          <div class="editor-top">
+            <div class="wall-tools">
+              <button type="button" data-wall="add" aria-pressed="false">Add wall</button>
+              <button type="button" data-wall="gap" aria-pressed="false">Cover gap</button>
+              <button type="button" data-wall="floor" aria-pressed="false">Add floor</button>
+              <button type="button" data-wall="door" aria-pressed="false">Add door</button>
+              <button type="button" data-wall="finish-floor" hidden>Finish floor</button>
+              <button type="button" data-wall="reset" hidden>Reset walls</button>
+            </div>
+            <div class="edit-actions">
+              <button type="button" data-wall="undo" hidden>Undo</button>
+              <button type="button" data-wall="done">Done</button>
+            </div>
+          </div>
+          <div class="editor-bottom">
+            <p class="edit-status wall-status" role="status"></p>
+            <div class="edit-selection wall-selection" hidden>
+              <output class="wall-measure" aria-label="Wall measurement"></output>
+              <button type="button" data-wall="rotate">Rotate 90°</button>
+              <button type="button" data-wall="remove">Remove wall</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside class="device" aria-label="Deebot map options">
+        <div>
+          <h2>Deebot T90</h2>
+          <p class="device-state">Saved Ecovacs map</p>
+          <p class="furnishing-note">Your furnishings</p>
+        </div>
+        <div class="product"></div>
+        <p id="layout-status" hidden></p>
+        <div class="tools">
+          <button type="button" data-view="route" aria-pressed="true">
+            Cleaning path<span class="switch" aria-hidden="true"></span>
+          </button>
+          <button type="button" data-view="source" aria-pressed="false">Original scan</button>
+          <button type="button" data-furnishing="visible" aria-pressed="true">
+            Furnishings<span class="switch" aria-hidden="true"></span>
+          </button>
+          <button type="button" id="layout-lock" aria-pressed="false">Lock layout</button>
+          <button type="button" data-furnishing="edit" aria-expanded="false" aria-controls="furnishing-editor">Edit furnishings</button>
+          <button type="button" data-wall="edit" aria-expanded="false" aria-controls="wall-editor">Edit walls</button>
+        </div>
+      </aside>
+    </div>
+    <footer>
+      <span id="map-help">Drag to rotate. Scroll or pinch to zoom. Keyboard: ← → and + −.</span>
+      <button id="export-layout" type="button">Export room layout</button>
+      <div class="legend" aria-label="Legend">
+        <span><i class="line" aria-hidden="true"></i>Cleaning path</span>
+        <span><i class="ring" aria-hidden="true"></i>Dock</span>
+      </div>
+    </footer>
+  </main>
+  <script>/* INSERT_BUNDLE */</script>
+</body>
+</html>
