@@ -1,3 +1,4 @@
+import { installHistoryReplay, MAX_ROUTE_POINTS, MAX_ROUTE_SEGMENTS } from './history-route-scene.js';
 import { mapAgePin } from './map-age-pin.js';
 import { routeLight,lightWave } from './route-light.js';
 import { RasterRoute } from './roborock-route-order.js';
@@ -12,7 +13,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { setupFurnishings } from './ecovacs-furnishings.js';
 import { setupPlanEditor } from './roborock-plan-editor.js';
-import { defaultFinish, editMask, isWall, rgbAt, swatch, swatchSize } from './roborock-surfaces.js';
+import { aligned, defaultFinish, editMask, isWall, rgbAt, scanAnchor, swatch, swatchSize } from './roborock-surfaces.js';
 import { roomColors } from './roborock-map.js';
 
 const host = window.frameElement.t90Map;
@@ -28,8 +29,8 @@ let cleanPixels=null,wallCells,floorCells,slab;
 let rebuildSlab=true;
 let contact;
 const stockPalette=roomColors(Array.from({length:32},(_,i)=>({id:i+1})));
-let vacuumState,runOpen=false,order,baseline,firstFrame=false;
-let inkMap;
+let vacuumState,runOpen=false,order,baseline,historyReplay,routeAnchor;
+let inkMap, runStart=NaN, lastCleaningPhase=NaN;
 const inkStep={value:new THREE.Vector2()},inkTexture={value:null},inkTotal={value:1},inkVisible={value:0},inkGain={value:0};
 function overlayControl(button,key,defaultOn=()=>false) {
   let choice=null;
@@ -133,25 +134,35 @@ const projectAge=mapAgePin(viewer,()=>robot?.visible && native.hidden && camera 
 const draw = () => { if (renderer && surface) {renderer.render(scene,camera); projectAge();} };
 const pulse=routeLight(viewer,draw);
 function syncPulse(){
+  if(historyReplay?.active && (planner?.comparing || editingFurniture || planner?.editing || !['idle','docked','charging'].includes(vacuumState)))historyReplay.stop();
   const on=runOpen && showTrail() && !!order?.count;
   inkVisible.value=on?1:0;
   pulse.enable(!!(on && vacuumState==='cleaning' && !planner?.comparing && !editingFurniture && !planner?.editing));
 }
 function clearRoute(){
-  order=null;inkMap?.dispose();inkMap=null;inkTexture.value=null;inkTotal.value=1;inkVisible.value=0;
+  order=null;routeAnchor=null;inkMap?.dispose();inkMap=null;inkTexture.value=null;inkTotal.value=1;inkVisible.value=0;
 }
-function updateRoute(){
+function updateRoute(imageTime){
   if(!runOpen)return;
-  if(!order || order.width!==pixels.width || order.height!==pixels.height){
+  const remapped=routeAnchor && !aligned(routeAnchor,pixels);
+  const stale=Date.parse(imageTime)<runStart;
+  if(stale || !order || order.width!==pixels.width || order.height!==pixels.height || remapped){
     clearRoute();
-    const stale=firstFrame && Date.parse(host.imageTime)<Date.parse(host.stateSince);
-    const old=stale?pixels:baseline;
+    const old=(stale || remapped)?pixels:baseline;
     order=new RasterRoute(pixels.width,pixels.height,old?.width===pixels.width && old?.height===pixels.height?old.data:null);
-    firstFrame=false;baseline=null;
+    const anchor=scanAnchor(pixels);
+    routeAnchor=anchor.points.length?anchor:null;
+    if(routeAnchor)host.onHistoryRoute?.({scope:host.scope,space:'roborock-image',anchor:routeAnchor,segments:[]});
+    baseline=null;
     inkMap=new THREE.DataTexture(order.rgba,pixels.width,pixels.height);
     inkMap.flipY=true;inkTexture.value=inkMap;inkStep.value.set(2/pixels.width,2/pixels.height);
   }
+  const previous=order.pointCount;
   order.update(pixels.data,marker);
+  if(routeAnchor && order.pointCount!==previous){
+    host.onHistoryRoute?.({scope:host.scope,space:'roborock-image',anchor:routeAnchor,segments:order.segments.slice(),
+      partial:order.pointCount>=MAX_ROUTE_POINTS || order.segments.length>=MAX_ROUTE_SEGMENTS});
+  }
   inkMap.needsUpdate=true;inkTotal.value=order.end;
   inkGain.value=.23+.77*Math.min(1,order.end/Math.max(1,pixels.width*.65));
   syncPulse();
@@ -189,7 +200,7 @@ function deletedAt(x,y) {
 function recolor() {
   if (!pixels || !texture) return;
   if(!cleanPixels){
-    const hideTrail=runOpen || !showTrail(),hideCarpet=!showCarpet();
+    const hideTrail=historyReplay?.active || runOpen || !showTrail(),hideCarpet=!showCarpet();
     cleanPixels=(hideTrail || hideCarpet || marker) ? withoutScanOverlays(pixels,stockPalette,{hideTrail,hideCarpet,marker}) : pixels;
   }
   const source=cleanPixels;
@@ -405,7 +416,7 @@ function setupFurniture() {
   canvas.addEventListener('keydown',event=>furniture.handleKey(event));
   furniture.setLighting(!topView && host.appearance==='night');
 }
-async function present(blob) {
+async function present(blob,imageTime) {
   if (!blob || blob===currentBlob || blob===pendingBlob) return;
   const epoch=++generation;
   pendingBlob=blob;
@@ -417,6 +428,7 @@ async function present(blob) {
     paint.width=bitmap.width; paint.height=bitmap.height; ctx.drawImage(bitmap,0,0);
     cleanPixels=null;pixels=ctx.getImageData(0,0,paint.width,paint.height);
     if(renderer) {
+      historyReplay?.validate();
       marker=locateRobot(pixels);robot.visible=!!marker;
       viewer.dataset.robotMarker=marker?'model':'native';
       if(marker){
@@ -424,7 +436,7 @@ async function present(blob) {
         robot.position.set(marker.x+.5-pixels.width/2,.3,marker.y+.5-pixels.height/2);
         robot.rotation.y=marker.heading;
       }
-      updateRoute();
+      updateRoute(imageTime);
       if(resize) {
         if(surface) {scene.remove(surface);surface.geometry.dispose();surface.material.roughnessMap.dispose();surface.material.dispose();texture.dispose();}
         texture=new THREE.CanvasTexture(paint); texture.colorSpace=THREE.SRGBColorSpace;
@@ -503,13 +515,16 @@ window.t90SetAppearance=look=>{
   setSceneLight();draw();
 };
 window.roborockUpdate = ({blob,rooms,selected,vacuumState:state})=>{
-  if(state!==vacuumState){
+  const since=Date.parse(host.stateSince);
+  const missedPhase=state==='cleaning' && vacuumState==='cleaning' && since>lastCleaningPhase;
+  if(state==='cleaning' && Number.isFinite(since))lastCleaningPhase=since;
+  if(state!==vacuumState || missedPhase){
     const prior=vacuumState;vacuumState=state;
-    if(state==='cleaning' && !runOpen){
-      clearRoute();runOpen=true;firstFrame=true;
-      baseline=prior==='docked' || prior==='idle'?pixels:null;
-      if(pixels && blob===currentBlob)updateRoute();
-    } else if(state==='docked' || state==='idle'){
+    if(state==='cleaning' && (!runOpen || missedPhase)){
+      clearRoute();runOpen=true;runStart=since;
+      baseline=['docked','idle','charging','error'].includes(prior) || missedPhase ? pixels : null;
+      if(pixels && blob===currentBlob)updateRoute(host.imageTime);
+    } else if(['docked','idle','charging','error'].includes(state)){
       runOpen=false;baseline=null;clearRoute();
     }
     routeButton.setAttribute('aria-pressed',String(showTrail()));
@@ -519,7 +534,7 @@ window.roborockUpdate = ({blob,rooms,selected,vacuumState:state})=>{
   const changed=next.size!==selection.size || [...next].some(v=>!selection.has(v)) || rooms!==host.drawnRooms;
   planner?.updateRooms(rooms);host.drawnRooms=rooms; selection=next; if (changed) colors=roomColors(rooms);
   if(changed) recolor();
-  present(blob);
+  present(blob,host.imageTime);
 };
 try {
   renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
@@ -527,6 +542,10 @@ try {
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   viewer.append(renderer.domElement);
   scene=new THREE.Scene();scene.add(robot); camera=new THREE.OrthographicCamera(-1,1,1,-1,1,10000);
+  historyReplay=installHistoryReplay({host,viewer,parent:scene,width:5.6,lift:.7,
+    compatible:snapshot=>snapshot.space==='roborock-image' && pixels && aligned(snapshot.anchor,pixels),
+    available:()=>Boolean(surface && currentBlob && ['idle','docked','charging'].includes(vacuumState) && !editingFurniture && !planner?.editing && !planner?.comparing),
+    offset:()=>[-pixels.width/2,-pixels.height/2],draw,changed:()=>{cleanPixels=null;recolor();}});
   orbit=new OrbitControls(camera,renderer.domElement);
   orbit.maxPolarAngle=Math.PI*.46; orbit.minZoom=.5; orbit.maxZoom=10;
   orbit.addEventListener('change',draw);

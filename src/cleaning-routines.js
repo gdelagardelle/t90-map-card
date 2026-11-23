@@ -1,3 +1,4 @@
+import favoriteCss from './routine-favorite.css';
 import {getRoborockFloor} from './roborock-map.js';
 import {aligned, scanAnchor} from './roborock-surfaces.js';
 
@@ -148,13 +149,17 @@ async function startRoutine(card,entry,say,endPreview){
     card.routineLock=null;
     say('Sending Start for '+r.name+'…');
     startSent=true;
-    if(card.roborock && !r.whole){
-      await card.cleanRoborockRooms(async()=>{
-        await ready();check(r.settings.every(choice=>picked(card,choice)),'A setting changed before Start.');
-      });
-    }else await card.control('start');
-    const result=card.lastTestCommand?.result;
-    check(['Accepted by Home Assistant','Cleaning confirmed','Requested'].includes(result),'Home Assistant did not confirm the Start request. Check the robot status.');
+    const previousCommand=card.liveCommand;
+    const task=card.roborock && !r.whole?card.cleanRoborockRooms(async()=>{
+      await ready();check(r.settings.every(choice=>picked(card,choice)),'A setting changed before Start.');
+    }):card.control('start');
+    const command=card.liveCommand;
+    if(command && command!==previousCommand){
+      command.routineName=r.name;
+      command.routineId=r.id;
+    }
+    await task;
+    check(command && command!==previousCommand && ['Accepted by Home Assistant','Cleaning confirmed'].includes(command.result),'Home Assistant did not confirm the Start request. Check the robot status.');
     say('Start sent for '+r.name+'.');
   }catch(err){
     throw Error((startSent?'':'Start was not sent. ')+(err.message || 'Home Assistant rejected the request.')+
@@ -179,7 +184,11 @@ function write(card,scope,original,replacement){
     if(original){
       const i=routines.findIndex(r=>r.id===original.id);
       check(i>=0 && same(routines[i],original),'Another editor changed this routine. Reopen it before saving.');
-      if(replacement)routines[i]=replacement;else routines.splice(i,1);
+      if(replacement)routines[i]=replacement;
+      else{
+        routines.splice(i,1);
+        if(record.favorite_routine===original.id)delete record.favorite_routine;
+      }
     }else{
       check(!routines.some(r=>r.id===replacement.id),'Choose a new routine again.');routines.push(replacement);
     }
@@ -250,7 +259,7 @@ function edit(card,entry,refresh){
   save.className='primary';ui.actions.append(save,cancel);
   ui.d.addEventListener('cancel',e=>{if(saving)e.preventDefault();});
 }
-function review(card,entry,refresh){
+function review(card,entry,refresh,opener){
   card.routineReview?.close();
   const {r,scope}=entry,box=el('section'),summary=el('p'),message=el('p'),actions=el('div');
   box.setAttribute('role','region');box.setAttribute('aria-label','Review routine');
@@ -266,6 +275,7 @@ function review(card,entry,refresh){
     if(pending)return;
     if(card.routineReview===controller)card.routineReview=null;
     box.remove();card.refresh();
+    if(opener?.isConnected && !opener.hidden)opener.focus({preventScroll:true});
   };
   const start=btn('Start routine',async()=>{
     if(pending || start.disabled)return;
@@ -315,7 +325,20 @@ function review(card,entry,refresh){
   card.routineReview=controller;card.refresh();
   box.scrollIntoView({block:'start'});close.focus({preventScroll:true});
 }
+async function saveFavorite(card,entry,expected){
+  const {scope,r}=entry,epoch=card.generation;
+  const removing=expected===r.id;
+  if(!removing)await verifyFloor(card,scope,r);
+  check(card.scope===scope && card.generation===epoch,'The active floor changed. Reopen its routines.');
+  await card.updateDashboardCard(record=>{
+    check((record.favorite_routine ?? null)===expected,'The favorite changed in another dashboard. Reload before choosing again.');
+    check(same(record.routines?.find(item=>item.id===r.id),r),'The routine changed. Reload before choosing a favorite.');
+    if(removing)delete record.favorite_routine;
+    else record.favorite_routine=r.id;
+  },scope);
+}
 export function mountRoutines(card){
+  const styles=el('style',favoriteCss);card.shadowRoot.append(styles);
   const details=el('details'),summary=el('summary','Cleaning routines'),content=el('div'),select=el('select'),actions=el('div'),note=el('p');
   details.className='cleaning-routines';actions.className='actions';content.className='content';select.setAttribute('aria-label','Saved routine');note.setAttribute('role','status');
   const choice=()=>list(card).find(entry=>JSON.stringify([entry.scope,entry.r.id])===select.value);
@@ -323,9 +346,35 @@ export function mountRoutines(card){
     check(!card.routineReview?.pending,'Wait for the current routine request to finish.');
     note.textContent='';fn();
   }catch(err){note.textContent=err.message;}};
-  let signature='';
+  let signature='',savingFavorite=false;
+  const favorite=()=>card.config?.maps?.[card.scope]?.favorite_routine ?? null;
+  const quick=btn('',()=>{
+    if(card.routineReview?.pending)return;
+    const entry=card.config?.maps?.[card.scope]?.routines?.find(r=>r.id===favorite());
+    if(entry)review(card,{scope:card.scope,r:entry},refresh,quick);
+  });
+  quick.className='routine-favorite';quick.hidden=true;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),star=document.createElementNS(svg.namespaceURI,'path');
+  svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
+  star.setAttribute('d','m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z');
+  svg.append(star);quick.append(svg);
+  function refreshQuick(){
+    if(!card.ui?.contains(details))return;
+    const record=card.config?.maps?.[card.scope];
+    const r=record?.favorite_routine && record.routines?.find(row=>row.id===record.favorite_routine);
+    const device=card.h?.entities?.[card.vacuum]?.device_id;
+    const visible=Boolean(r && device && r.device===device && card.h.entities?.[card.image]?.device_id===device);
+    quick.hidden=!visible;
+    if(visible){
+      const title='Review favorite: '+r.name;
+      if(quick.title!==title){quick.title=title;quick.setAttribute('aria-label',title);}
+      quick.disabled=!!card.routineReview?.pending || card.h?.connected===false || !available(card.h.states?.[card.vacuum]?.state);
+      if(!quick.parentNode)card.q('[data-action=start]')?.after(quick);
+    }
+  }
   function refresh(id,scope){
-    if(!card.config)return;
+    if(!card.config || !card.ui?.contains(details))return;
+    refreshQuick();
     const entries=list(card),sig=JSON.stringify(entries.map(e=>[e.scope,e.r.id,e.r.name,e.scope===card.scope]));
     if(sig!==signature){const last=select.value;select.replaceChildren(...entries.map(e=>new Option(e.r.name+(e.scope===card.scope?'':' · Previous floor'),JSON.stringify([e.scope,e.r.id]))));
       if([...select.options].some(o=>o.value===last))select.value=last;
@@ -333,20 +382,35 @@ export function mountRoutines(card){
     }
     if(id)select.value=JSON.stringify([scope,id]);
     select.hidden=reviewButton.hidden=editButton.hidden=remove.hidden=!entries.length;
+    const chosen=choice();
+    pin.hidden=!chosen || chosen.scope!==card.scope;
+    pin.disabled=savingFavorite || !!card.routineReview?.pending || !mapReady(card);
+    const isFavorite=Boolean(chosen && chosen.scope===card.scope && chosen.r.id===favorite());
+    pin.textContent=isFavorite?'Unpin favorite':'Pin as favorite';
     add.disabled=!card.mapReady || !card.scope;
   }
   const add=btn('New routine',safe(()=>edit(card,null,refresh)));
   const reviewButton=btn('Review',safe(()=>{const entry=choice();if(entry)review(card,entry,refresh);}));
   const editButton=btn('Edit',safe(()=>{const entry=choice();if(entry)edit(card,entry,refresh);}));
+  const pin=btn('Pin as favorite',async()=>{
+    const entry=choice(),expected=favorite();
+    if(!entry || entry.scope!==card.scope || savingFavorite || card.routineReview?.pending)return;
+    savingFavorite=true;pin.disabled=true;note.textContent='';
+    try{
+      await saveFavorite(card,entry,expected);
+      note.textContent=expected===entry.r.id?'Favorite removed.':'Favorite saved beside Start.';
+    }catch(err){note.textContent=err.message;}
+    finally{savingFavorite=false;refresh();}
+  });
   const remove=btn('Remove',safe(()=>{
     const entry=choice();if(!entry)return;
     const ui=dialog(card,'Remove routine');ui.content.append(el('p','Remove “'+entry.r.name+'” from this dashboard?'));
     const commit=btn('Remove routine',async()=>{commit.disabled=true;try{await write(card,entry.scope,entry.r,null);refresh();ui.close();}catch(err){ui.say(err.message);commit.disabled=false;}});
     ui.actions.append(commit,btn('Cancel',ui.close));
   }));
-  select.onchange=reviewButton.onclick;
-  actions.append(add,reviewButton,editButton,remove);content.append(select,actions,note);details.append(summary,content);
+  select.onchange=()=>{refresh();reviewButton.onclick();};
+  actions.append(add,reviewButton,pin,editButton,remove);content.append(select,actions,note);details.append(summary,content);
   card.ui.querySelector('.rooms').after(details);
   details.ontoggle=()=>{if(details.open)refresh();};
-  return ()=>{if(details.open)refresh();};
+  return ()=>{if(details.open)refresh();else refreshQuick();};
 }

@@ -1,0 +1,65 @@
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import {build} from 'esbuild';
+import {chromium} from 'playwright-core';
+
+const source=await build({entryPoints:['src/last-clean-panel.js'],bundle:true,write:false,format:'esm',loader:{'.css':'text'}});
+const pageHtml='<!doctype html><meta name="viewport" content="width=device-width"><main></main>';
+const server=http.createServer((req,res)=>{
+  const js=req.url==='/panel.js';res.writeHead(200,{'Content-Type':js?'text/javascript':'text/html'});
+  res.end(js?source.outputFiles[0].text:pageHtml);
+});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const browser=await chromium.launch({executablePath:process.env.CHROME_BIN || undefined});
+try {
+  const page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('http://127.0.0.1:'+server.address().port);
+  await page.evaluate(async()=>{
+    const {mountLastClean}=await import('/panel.js');
+    const root=document.querySelector('main').attachShadow({mode:'open'});
+    root.innerHTML='<style>[hidden]{display:none!important}*{box-sizing:border-box}</style><div class="map-row"><iframe></iframe></div><div class="main-actions"><button>Start robot</button></div><section class="panel"></section>';
+    const q=s=>root.querySelector(s),frame=q('iframe');
+    const card=window.card={ui:q('.panel'),q,frame,scope:'fictional-floor',vacuum:'vacuum.test',h:{connected:true,states:{'vacuum.test':{state:'docked'}}},mapReady:true};
+    frame.contentDocument.body.innerHTML='<div><div class="viewer"></div></div>';
+    frame.t90Map={};window.calls=[];
+    frame.contentWindow.t90ReplayHistory=record=>{calls.push(['replay',record]);frame.t90Map.onHistoryPlayback?.(true);return true;};
+    frame.contentWindow.t90StopHistoryReplay=()=>{calls.push(['restore']);frame.t90Map.onHistoryPlayback?.(false);};
+    window.panel=mountLastClean(card);
+    window.record={firstSeenAt:Date.UTC(2026,0,1,12),lastSeenAt:Date.UTC(2026,0,1,12,8),endedAt:Date.UTC(2026,0,1,12,9),endState:'docked',requestedRooms:['Studio'],reportedRooms:['Hall'],outcome:null,partial:true,route:{scope:'fictional-floor',space:'ecovacs-map',anchor:null,segments:[[[0,0],[2,1]]]}};
+  });
+  await page.getByText('No clean recorded yet').waitFor();
+  await page.getByText('Last clean',{exact:true}).click();
+  await page.evaluate(()=>panel.update(record));
+  await page.getByText('Observed duration').waitFor();
+  await page.getByText('8 min',{exact:true}).waitFor();
+  assert.equal(await page.locator('dl').innerText().then(t=>t.includes('Requested rooms\nStudio')&&t.includes('Robot seen in\nHall')&&!t.includes('Completed')),true);
+  const replay=page.getByRole('button',{name:'Replay partial route'});
+  await replay.click();
+  await page.getByText('Showing the recorded route').waitFor();
+  assert.equal(await page.evaluate(()=>calls[0][1].segments[0].length),2);
+  await page.getByRole('button',{name:'Return to live map'}).click();
+  assert.equal(await replay.evaluate(e=>e.getRootNode().activeElement===e),true);
+  await replay.click();
+  await page.evaluate(()=>{card.frame.contentDocument.querySelector('.viewer').dataset.furnishingEditing='true';});
+  await page.getByText('Finish editing to replay.').waitFor();
+  assert.ok(await replay.isDisabled());
+  await page.evaluate(()=>{card.frame.contentDocument.querySelector('.viewer').dataset.furnishingEditing='false';});
+  await replay.click();
+  await page.evaluate(()=>{card.h.states['vacuum.test'].state='cleaning';panel.update(record);});
+  assert.ok(await replay.isDisabled());
+  assert.ok(await page.getByRole('button',{name:'Return to live map'}).isHidden());
+  await page.evaluate(()=>{card.h.states['vacuum.test'].state='idle';card.scope='other-floor';panel.update(record);});
+  await page.getByText('Open the recorded floor to replay its route.').waitFor();
+  await page.evaluate(()=>panel.update({...record,route:null,deviceReportOnly:true,requestedRooms:null,firstSeenAt:null,lastSeenAt:null,reportedRooms:[]}));
+  await page.getByText('Robot report · floor unverified').waitFor();
+  assert.equal(await page.getByRole('button',{name:/Replay( partial)? route/}).count(),0);
+  await page.evaluate(()=>panel.update({...record,deviceReportOnly:true,recorderOnly:true,route:null,requestedRooms:null,reportedRooms:[],durationMinutes:12}));
+  await page.getByText('Home Assistant history · floor unverified').waitFor();
+  await page.getByText('Elapsed time',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:/Replay( partial)? route/}).count(),0);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.evaluate(()=>panel.destroy());
+  assert.deepEqual(errors,[]);
+  console.log('Last clean summary, observation provenance, partial replay, reduced motion label, restore, active/editing/floor guards, report-only fallback and mobile width passed.');
+}finally{await browser.close();server.close();}

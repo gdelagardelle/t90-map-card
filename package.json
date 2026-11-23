@@ -1,12 +1,12 @@
 {
   "name": "t90-map-card",
-  "version": "0.3.0-beta.8",
+  "version": "0.3.0-beta.9",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node tests/roborock-geometry.mjs && node tests/browser.mjs && node tests/ecovacs-start.mjs && node tests/roborock.mjs && node tests/setup-report.mjs && node tests/layout-recovery.mjs && node tests/layout-recovery-browser.mjs && node tests/visual-beta7.mjs && node tests/live-status.mjs && node tests/routines-browser.mjs && node tests/linked-lights.mjs"
+    "test": "node tests/roborock-geometry.mjs && node tests/browser.mjs && node tests/ecovacs-start.mjs && node tests/roborock.mjs && node tests/setup-report.mjs && node tests/layout-recovery.mjs && node tests/layout-recovery-browser.mjs && node tests/visual-beta7.mjs && node tests/live-status.mjs && node tests/routines-browser.mjs && node tests/linked-lights.mjs && node tests/clean-history.mjs && node tests/clean-reports.mjs && node tests/history-route-geometry.mjs && node tests/last-clean-browser.mjs && node tests/favorite-browser.mjs && node tests/last-clean-integration.mjs"
   },
   "dependencies": {
     "three": "0.186.0"

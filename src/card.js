@@ -1,3 +1,5 @@
+import {mountCardHistory} from './card-clean-history.js';
+import {mountLastClean} from './last-clean-panel.js';
 import { mountRoutines } from './cleaning-routines.js';
 import { currentReference, mountRecovery, vectorReference } from './layout-recovery.js';
 import './editor.js';
@@ -41,6 +43,8 @@ class T90MapCard extends HTMLElement {
         if (config.entity && !/^vacuum\.[a-z0-9_]+$/.test(config.entity) ||
             config.map_entity && !/^image\.[a-z0-9_]+$/.test(config.map_entity)) throw Error('Invalid vacuum or map entity ID.');
       }
+      this.historyBridge?.detach();
+      this.lastCleanPanel?.destroy();
       this.generation++;
       this.cancelStartWatch();
       this.abort?.abort();
@@ -59,6 +63,8 @@ class T90MapCard extends HTMLElement {
     const roborock = config.map_source === 'roborock_qrevo';
     const changed = this.config && (this.vacuum !== config.entity || this.image !== config.map_entity || this.roborock !== roborock);
     if (changed) {
+      this.historyBridge?.detach();
+      this.lastCleanPanel?.destroy();
       if(this.routineLock){this.routineLock=null;this.busy=false;}
       this.generation++;
       this.routineReview=null;
@@ -102,11 +108,16 @@ class T90MapCard extends HTMLElement {
     if (this.ui) this.refresh();
   }
   connectedCallback() {
+    this.historyBridge?.resume();
+    this.visibilityListener ||= () => this.historyBridge?.refresh();
+    document.addEventListener('visibilitychange',this.visibilityListener);
     if (!this.timer) this.timer = setInterval(() => { this.refreshLiveStatus(); this.pullMap(); }, 5000);
     if (this.ui) this.controlsObserver?.observe(this.q('.cockpit'));
     if (this.ui && this.h) this.refresh();
   }
   disconnectedCallback() {
+    document.removeEventListener('visibilitychange',this.visibilityListener);
+    this.historyBridge?.detach();
     this.controlsObserver?.disconnect();
     this.cancelStartWatch();
     if (this.ui && !this.roborock) this.commandStatus('');
@@ -156,6 +167,8 @@ ${cardStyles}</style>
     this.q = sel => this.shadowRoot.querySelector(sel);
     mountRecovery(this);
     this.refreshRoutines=mountRoutines(this);
+    this.lastCleanPanel=mountLastClean(this);
+    this.historyBridge=mountCardHistory(this);
     const preferenceKey = 't90:' + this.vacuum + ':' + this.image + ':appearance';
     let look;
     try { look = localStorage.getItem(preferenceKey); } catch { /* Storage is optional. */ }
@@ -265,7 +278,7 @@ ${cardStyles}</style>
     this.layoutKeys = [scope + ':furniture', scope + ':walls'];
     this.pendingRegion = null;
     this.q('dialog').close();
-    this.frame.t90Map = { lights:createFixtureLights(()=>this.h), scan: map.svg, scope, appearance: this.dataset.appearance,
+    this.frame.t90Map = { ...this.historyBridge.attach(scope), lights:createFixtureLights(()=>this.h), scan: map.svg, scope, appearance: this.dataset.appearance,
       placementBounds: this.config.maps?.[scope]?.placement_bounds };
     this.installSavedLayout();
     this.frame.classList.remove('fixture-link-open');
@@ -311,6 +324,7 @@ ${cardStyles}</style>
     const reference=vectorReference(this.frame.t90Map?.scan);
     await this.updateDashboardCard(card=>{card.layout=layout;card.layout_version=Date.now();if(reference)card.recovery_reference=reference;});
     this.installSavedLayout();
+    this.lastCleanPanel?.stop();
     this.frame.srcdoc = this.frame.srcdoc;
     this.note('Layout saved for this dashboard.');
   }
@@ -371,6 +385,7 @@ ${cardStyles}</style>
     const cleanV2 = this.usesT90MaxCleanV2();
     const request = this.lastTestCommand = this.liveCommand = {action:roomClean ? 'Room clean' : action,result:'Requested',at:Date.now()};
     const epoch = this.generation;
+    const acceptedTarget = action === 'Start' ? this.historyBridge?.target(rooms,request.at) : null;
     this.startRequest = request;
     this.commandStatus(action + ' requested · ' + description, 'pending');
     try {
@@ -387,6 +402,7 @@ ${cardStyles}</style>
         data = {command:'spot_area',params:{rooms,cleanings:Number(this.h.states[this.id('number','clean_count')]?.state)||1}};
       }
       await this.h.callService('vacuum', service, data, {entity_id:this.vacuum});
+      if (epoch === this.generation) acceptedTarget?.();
       if (this.startRequest !== request) return;
       request.result='Accepted by Home Assistant';
       this.commandStatus('Waiting for the Deebot to report cleaning…', 'pending');
@@ -418,16 +434,19 @@ ${cardStyles}</style>
     if (this.busy || !entity) return;
     const action = (domain === 'vacuum' && {start:this.h.states[this.vacuum]?.state === 'paused'?'Resume':'Start',pause:'Pause',stop:'Stop',return_to_base:'Go home'}[data.params?.act || service]) || (domain === 'button' ? 'Dock action' : 'Setting');
     const record=this.lastTestCommand={action,result:'Requested',at:Date.now()};
+    const acceptedTarget = action === 'Start' ? this.historyBridge?.target([],record.at) : null;
     if(domain==='vacuum' && action!=='Setting')this.liveCommand=record;
     this.busy = true; this.refresh();
     try {
       await this.h.callService(domain,service,data,{entity_id:entity});
+      acceptedTarget?.();
       record.result='Accepted by Home Assistant';
       this.note('Command sent · ' + title(service));
     } catch (err) { record.result='Rejected'; this.note('Command failed · ' + (err.message || 'Home Assistant rejected the request')); }
     finally { this.busy = false; this.refresh(); }
   }
   control(action) {
+    this.lastCleanPanel?.stop();
     if(action==='start' && this.routineReview?.blocked){
       this.note('Use Start routine to run the preview, or close the review for manual cleaning.');
       return;
@@ -619,8 +638,9 @@ ${cardStyles}</style>
     this.q('.rooms summary').textContent = 'Choose rooms · ' + (count ? count+' selected' : 'Whole home');
     this.q('.reassign').setAttribute('aria-pressed',String(!!this.renaming));
     this.q('.target').textContent = this.roborock && !count && !this.rrFloor ? 'Whole home' : this.renaming ? 'Tap the room to rename' : count ? [...this.selectedRooms].map(id=>(this.roomLabels.get(id) || 'Room '+id)).join(' · ') : (this.roborock ? 'Whole home · Tap rooms on the map' : 'Whole home');
+    this.historyBridge?.refresh();
     this.syncMapRooms();
-    for (const b of this.q('.main-actions').children) {
+    for (const b of this.q('.main-actions').querySelectorAll(':scope > [data-action]')) {
       const a = b.dataset.action;
       b.disabled = !active || this.busy || (a === 'start' && v.state === 'cleaning') || (a === 'pause' && v.state !== 'cleaning');
       if (a === 'start' && (this.routineReview?.blocked || startProblem || this.startRequest || (this.needsTargetChoice && v?.state!=='paused'))) b.disabled = true;
@@ -758,6 +778,8 @@ ${cardStyles}</style>
       known(this.h.states[this.vacuum]?.state) && (beforeStart || this.mapReady && stamp===this.h.states[this.image]?.state) &&
       this.roborockDeviceMatches() && JSON.stringify(target)===JSON.stringify([...this.selectedRooms]);
     const record=this.lastTestCommand=this.liveCommand={action:'Room clean',result:'Requested',at:Date.now()};
+    this.lastCleanPanel?.stop();
+    const acceptedTarget=this.historyBridge?.target(target,record.at);
     this.busy=true; this.refresh();
     try {
       if (!stillCurrent()) throw Error('Wait for the current Roborock map.');
@@ -766,6 +788,7 @@ ${cardStyles}</style>
         throw Error('Room list changed. Refresh the map and choose rooms again.');
       if(beforeStart){await beforeStart();if(!stillCurrent())throw Error('The target changed before Start.');}
       await this.h.callService('vacuum','send_command',{command:'app_segment_clean',params:[{segments:target}]},{entity_id:this.vacuum});
+      acceptedTarget?.();
       record.result='Accepted by Home Assistant';
       this.note('Room cleaning command sent.');
     } catch(err) {record.result='Rejected';if(epoch===this.generation) this.note(err.message || 'Room cleaning unavailable.');}
@@ -801,7 +824,7 @@ ${cardStyles}</style>
       this.scope=scope;
       const savedPlan=this.config.maps?.[scope]?.plan || null;
       let expected=savedPlan;
-      this.frame.t90Map={lights:createFixtureLights(()=>this.h), scope, savedPlan, canEdit:!!this.rrFloor,
+      this.frame.t90Map={...this.historyBridge.attach(scope), lights:createFixtureLights(()=>this.h), scope, savedPlan, canEdit:!!this.rrFloor,
         savePlan:async(plan)=>{
           if(this.scope!==scope || !this.mapReady || !this.rrFloor) throw Error('Wait for this floor to reconnect.');
           const reference=await currentReference(this);
